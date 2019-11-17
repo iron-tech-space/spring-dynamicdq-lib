@@ -1,0 +1,46 @@
+buildscript {
+	ext {
+		springBootVersion = '2.2.6.RELEASE'
+		postgresqlVersion = '42.2.12'
+
+		appVersion = "0.0.6"
+	}
+	repositories {
+		mavenCentral()
+	}
+	dependencies {
+		classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+	}
+}
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'io.spring.dependency-management'
+
+jar {
+	baseName = 'spring-dynamic-query-lib'
+	version = appVersion
+}
+
+group 'com.irontechspace'
+sourceCompatibility = 1.8
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	compile("org.projectlombok:lombok")
+	compile group: 'org.aspectj', name: 'aspectjtools', version:'1.9.5'
+	compile("org.springframework.boot:spring-boot-starter-activemq:${springBootVersion}")
+	compile("org.springframework.boot:spring-boot-starter-web:${springBootVersion}")
+	compile("org.springframework.boot:spring-boot-starter-data-jdbc:${springBootVersion}")
+	compile("org.postgresql:postgresql:${postgresqlVersion}")
+}
+
+compileJava {
+	options.encoding = "UTF-8"
+}
+
+dependencyManagement {
+	imports { mavenBom("org.springframework.boot:spring-boot-dependencies:${springBootVersion}") }
+}
