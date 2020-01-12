@@ -3,7 +3,7 @@ buildscript {
 		springBootVersion = '2.2.6.RELEASE'
 		postgresqlVersion = '42.2.12'
 
-		appVersion = "0.0.6"
+		appVersion = "0.0.30"
 	}
 	repositories {
 		mavenCentral()
@@ -30,10 +30,11 @@ repositories {
 
 dependencies {
 	compile("org.projectlombok:lombok")
-	compile group: 'org.aspectj', name: 'aspectjtools', version:'1.9.5'
+	compile("org.aspectj:aspectjtools:1.9.5")
 	compile("org.springframework.boot:spring-boot-starter-activemq:${springBootVersion}")
 	compile("org.springframework.boot:spring-boot-starter-web:${springBootVersion}")
 	compile("org.springframework.boot:spring-boot-starter-data-jdbc:${springBootVersion}")
+	compile("org.springframework.security:spring-security-crypto")
 	compile("org.postgresql:postgresql:${postgresqlVersion}")
 }
 

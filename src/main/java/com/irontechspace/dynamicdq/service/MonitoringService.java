@@ -28,7 +28,7 @@ public class MonitoringService {
 
     private ObjectMapper mapper = new ObjectMapper();
 
-    @Value("${sys.monitoring.active}")
+    @Value("${dynamicdq.monitoring.active}")
     Boolean monitoringActive;
 
 
@@ -46,7 +46,7 @@ public class MonitoringService {
             on.put("serviceAddress", env.getProperty("service.address"));
             on.put("serviceTime", LocalDateTime.now().toEpochSecond(ZoneOffset.ofHours(3)));
             jmsTemplate.convertAndSend("monitoringQueue", mapper.writeValueAsString(on));
-            log.info("Sent to monitoringQueue [{}] [{}]", env.getProperty("service.domain"), env.getProperty("service.address"));
+            log.info("#> Sent to monitoringQueue [{}] [{}]", env.getProperty("service.domain"), env.getProperty("service.address"));
         }
     }
 }

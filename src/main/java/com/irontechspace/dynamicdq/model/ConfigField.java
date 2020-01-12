@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.data.relational.core.mapping.Table;
 
 import java.util.UUID;
 
@@ -14,12 +13,13 @@ import java.util.UUID;
 @AllArgsConstructor
 public class ConfigField {
     private UUID id;
-    private UUID idConfig;
+    private UUID configId;
     private String name;
     private String alias;
     private String header;
     private String description;
-    private String type;
+    private String typeData;
+    private String typeField;
     private String linkPath;
     private String linkView;
     private Boolean visible;

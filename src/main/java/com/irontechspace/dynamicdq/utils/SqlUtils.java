@@ -1,5 +1,6 @@
-package com.irontechspace.dynamicdq.repository.utils;
+package com.irontechspace.dynamicdq.utils;
 
+import com.irontechspace.dynamicdq.model.TypeSql;
 import org.springframework.jdbc.core.namedparam.BeanPropertySqlParameterSource;
 
 import java.lang.reflect.Field;
@@ -27,25 +28,46 @@ public class SqlUtils {
         return String.format("DELETE FROM %s WHERE %s=:%s ", tableName, whereField.replaceAll("([^_A-Z])([A-Z])", "$1_$2").toLowerCase(), whereField);
     }
 
-    public static <T> String generateSql(TypeGenerateSql type, String tableName, Class<T> clazz){
+    public static String getSqlForRecursiveDelete(String tableName, String whereFields){
+        return getSqlForRecursive("DELETE", tableName, whereFields);
+    }
+
+    public static String getSqlForRecursiveSelect(String tableName, String whereFields, String primaryKey){
+        return getSqlForRecursive("SELECT " + primaryKey, tableName, whereFields);
+    }
+
+    private static String getSqlForRecursive(String type, String tableName, String whereFields) {
+        return String.format("%s FROM %s WHERE %s",
+                type,
+                tableName,
+                whereFields);
+    }
+
+    public static <T> String generateSql(TypeSql type, String tableName, Class<T> clazz){
         return generateSql(type, tableName, clazz, "id", new ArrayList<>());
     }
 
-    public static <T> String generateSql(TypeGenerateSql type, String tableName, Class<T> clazz, List<String> excludeFieldsNames){
+    public static <T> String generateSql(TypeSql type, String tableName, Class<T> clazz, List<String> excludeFieldsNames){
         return generateSql(type, tableName, clazz, "id", excludeFieldsNames);
     }
 
-    public static <T> String generateSql(TypeGenerateSql type, String tableName, Class<T> clazz, String primaryKey){
+    public static <T> String generateSql(TypeSql type, String tableName, Class<T> clazz, String primaryKey){
         return generateSql(type, tableName, clazz, primaryKey, new ArrayList<>());
     }
 
-    public static <T> String generateSql(TypeGenerateSql type, String tableName, Class<T> clazz, String primaryKey, List<String> excludeFieldsNames){
+    public static <T> String generateSql(TypeSql type, String tableName, Class<T> clazz, String primaryKey, List<String> excludeFieldsNames){
+        return generateSql(type, tableName, inspect(clazz), primaryKey, excludeFieldsNames);
+    }
 
-        List<String> fieldsNames = inspect(clazz);
+    public static <T> String generateSql(TypeSql type, String tableName, List<String> fieldsNames, String primaryKey, Boolean excludePrimaryKey){
+        return generateSql(type, tableName, fieldsNames, primaryKey,
+                excludePrimaryKey ? Collections.singletonList(primaryKey) : new ArrayList<>());
+    }
 
+    public static <T> String generateSql(TypeSql type, String tableName, List<String> fieldsNames, String primaryKey, List<String> excludeFieldsNames){
         switch (type) {
             case SELECT_BY_ID:
-                String select_sql = "SELECT %s \n FROM %s \n WHERE %s=:%s; \n";
+                String select_sql = "SELECT %s \n FROM %s \n WHERE %s=:%s;";
                 List<String> select_fields = new ArrayList<>();
                 for (String field : fieldsNames) {
                     if(!excludeFieldsNames.contains(field)){
@@ -56,9 +78,9 @@ public class SqlUtils {
                         select_sql, // Строка запроса
                         String.join(", ", select_fields), // Поля select-a
                         tableName,  // Имя таблицы
-                        primaryKey, primaryKey); // Условие выборки
+                        primaryKey.replaceAll("([^_A-Z])([A-Z])", "$1_$2").toLowerCase(), primaryKey); // Условие выборки
             case INSERT:
-                String insert_sql = "INSERT INTO %s \n ( %s ) \n VALUES( %s ) returning %s; \n";
+                String insert_sql = "INSERT INTO %s \n ( %s ) \n VALUES( %s ) returning %s;";
                 List<String> insert_fields = new ArrayList<>();
                 List<String> insert_values = new ArrayList<>();
                 for (String field : fieldsNames) {
@@ -73,9 +95,9 @@ public class SqlUtils {
                         tableName,  // Имя таблицы
                         String.join(", ", insert_fields), // Поля инсерта
                         String.join(", ", insert_values), // Параметры инсерта
-                        primaryKey); // Ключ который вернуть после выполнения
+                        primaryKey.replaceAll("([^_A-Z])([A-Z])", "$1_$2").toLowerCase()); // Ключ который вернуть после выполнения
             case UPDATE:
-                String update_sql = "UPDATE %s \n SET %s \n WHERE %s=:%s; \n";
+                String update_sql = "UPDATE %s \n SET %s \n WHERE %s=:%s;";
                 List<String> update_fields = new ArrayList<>();
                 for(String field : fieldsNames){
 //                    if(!field.equals("id") && !field.equals("fields"))
@@ -86,7 +108,7 @@ public class SqlUtils {
                         update_sql, // Строка запроса
                         tableName,  // Имя таблицы
                         String.join(", ", update_fields), // Параметры обновления
-                        primaryKey, primaryKey); // Условие обновления
+                        primaryKey.replaceAll("([^_A-Z])([A-Z])", "$1_$2").toLowerCase(), primaryKey); // Условие обновления
             default:
                 return null;
         }

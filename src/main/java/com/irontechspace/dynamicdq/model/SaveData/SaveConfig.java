@@ -1,30 +1,23 @@
-package com.irontechspace.dynamicdq.model;
+package com.irontechspace.dynamicdq.model.SaveData;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.List;
 import java.util.UUID;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ConfigTable {
+public class SaveConfig {
     private UUID id;
     private UUID userId;
     private String configName;
-    private String tableName;
     private String description;
     private Long position;
-    private Boolean hierarchical;
-    private String hierarchyField;
-    private String hierarchyView;
-    private Boolean hierarchyLazyLoad;
-    private String customSql;
     private String sharedForUsers;
     private String sharedForRoles;
-    private List<ConfigField> fields;
+    private String logic;
 }

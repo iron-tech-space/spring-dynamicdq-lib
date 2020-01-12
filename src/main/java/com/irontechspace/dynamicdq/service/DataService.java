@@ -5,7 +5,8 @@ import com.irontechspace.dynamicdq.model.ConfigTable;
 import com.irontechspace.dynamicdq.model.JoinTable;
 import com.irontechspace.dynamicdq.repository.DataRepository;
 import com.irontechspace.dynamicdq.repository.RowMapper.DataRowMapper;
-import com.irontechspace.dynamicdq.repository.utils.SqlUtils;
+import com.irontechspace.dynamicdq.utils.SqlUtils;
+import com.irontechspace.dynamicdq.utils.TypeConverter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -16,9 +17,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.stereotype.Service;
 
-import java.time.OffsetDateTime;
-import java.time.OffsetTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -34,6 +32,9 @@ public class DataService {
 
     @Autowired
     DataRepository dataRepository;
+
+    @Autowired
+    TypeConverter typeConverter;
 
 
     private static final String SQL_SELECT = " select %s ";
@@ -57,68 +58,58 @@ public class DataService {
 
 
     /** Получение плоской таблицы данных */
-    public List<ObjectNode> getFlatData(String configName, JsonNode filter, Pageable pageable){
+    public List<ObjectNode> getFlatData(String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
 
-        ConfigTable configTable = configService.getConfigByConfigName(configName);
+        ConfigTable configTable = configService.getConfigByConfigName(configName, userId, userRoles);
 
-        if(configTable == null)
-            return null;
-        else
-            return getFlatData(configTable, filter, pageable);
+        return getFlatData(configTable, userId, userRoles, filter, pageable);
     }
 
     /** Получение кол-ва данных в плоской таблице */
-    public Long getFlatDataCount(String configName, JsonNode filter, Pageable pageable){
+    public Long getFlatDataCount(String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
 
-        ConfigTable configTable = configService.getConfigByConfigName(configName);
+        ConfigTable configTable = configService.getConfigByConfigName(configName, userId, userRoles);
 
-        if(configTable == null)
-            return null;
-        else
-            return getFlatData(configTable, filter, pageable, true);
+        return getFlatData(configTable, userId, userRoles, filter, pageable, true);
     }
 
     /** Получение иерархической таблицы данных */
-    public List<ObjectNode> getHierarchicalData(String configName, JsonNode filter, Pageable pageable){
+    public List<ObjectNode> getHierarchicalData(String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
 
-        ConfigTable configTable = configService.getConfigByConfigName(configName);
+        ConfigTable configTable = configService.getConfigByConfigName(configName, userId, userRoles);
 
-        if(configTable == null)
-            return null;
-        else {
-            List<ObjectNode> result = getHierarchicalData(getFlatData(configTable, filter, pageable), configTable.getHierarchyField());
+        List<ObjectNode> result = getHierarchicalData(getFlatData(configTable, userId, userRoles, filter, pageable), configTable.getHierarchyField());
 
-            // Формирование мапы параметров поиска
-            Map<String, Pattern> searchFields = new HashMap<>();
-            for(ConfigField field : configTable.getFields()){
-                if(field.getFilterFields() != null && field.getFilterSigns() != null){
-                    String[] filterFields = field.getFilterFields().split("/");
-                    String[] filterSigns = field.getFilterSigns().split("/");
-                    if(filterFields.length == filterSigns.length){
-                        for (int i = 0; i < filterFields.length; i++) {
-                            if (filter.has(filterFields[i])
-                                    && (filterSigns[i].toLowerCase().equals("ilike") || filterSigns[i].toLowerCase().equals("like"))) {
-                                log.info("Add searchFields [{}] => {}", field.getAliasOrName(), filter.get(filterFields[i]).asText().replaceAll("\\s", ".+?"));
-                                searchFields.put(
-                                        field.getAliasOrName(),
-                                        Pattern.compile(filter.get(filterFields[i]).asText().replaceAll("\\s", ".+?")));
-                            }
+        // Формирование мапы параметров поиска
+        Map<String, Pattern> searchFields = new HashMap<>();
+        for(ConfigField field : configTable.getFields()){
+            if(field.getFilterFields() != null && field.getFilterSigns() != null){
+                String[] filterFields = field.getFilterFields().split("/");
+                String[] filterSigns = field.getFilterSigns().split("/");
+                if(filterFields.length == filterSigns.length){
+                    for (int i = 0; i < filterFields.length; i++) {
+                        if (filter.has(filterFields[i])
+                                && (filterSigns[i].toLowerCase().equals("ilike") || filterSigns[i].toLowerCase().equals("like"))) {
+                            log.info("Add searchFields [{}] => {}", field.getAliasOrName(), filter.get(filterFields[i]).asText().replaceAll("\\s", ".+?"));
+                            searchFields.put(
+                                    field.getAliasOrName(),
+                                    Pattern.compile(filter.get(filterFields[i]).asText().replaceAll("\\s", ".+?")));
                         }
                     }
                 }
             }
-            // Если мапа параметров поиска не пустая, то ищем
-            if(searchFields.size() > 0) {
-                log.info("Search by tree");
-                for (int i = result.size() - 1; i >= 0; i--) {
-                    if (removeRecursively(result.get(i), searchFields)) {
-                        result.remove(i);
-                    }
-                }
-            } else
-                log.info("Skip search by tree");
-            return result;
         }
+        // Если мапа параметров поиска не пустая, то ищем
+        if(searchFields.size() > 0) {
+            log.info("Search by tree");
+            for (int i = result.size() - 1; i >= 0; i--) {
+                if (removeRecursively(result.get(i), searchFields)) {
+                    result.remove(i);
+                }
+            }
+        } else
+            log.info("Skip search by tree");
+        return result;
     }
 
 
@@ -132,17 +123,18 @@ public class DataService {
         }
     }
 
-    private List<ObjectNode> getFlatData(ConfigTable configTable, JsonNode filter, Pageable pageable){
-        return getFlatData(configTable, filter, pageable, false);
+    private List<ObjectNode> getFlatData(ConfigTable configTable, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
+        return getFlatData(configTable, userId, userRoles, filter, pageable, false);
     }
 
-    private <T> T getFlatData(ConfigTable configTable, JsonNode filter, Pageable pageable, Boolean countQuery) {
+    private <T> T getFlatData(ConfigTable configTable, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable, Boolean countQuery) {
 
         List<ConfigField> fields = configTable.getFields();
         List<String> sourceFields = new ArrayList<>();
         List<JoinTable> joinTables = new ArrayList<>();
         List<String> filterOutside = new ArrayList<>();
         List<String> groupBy = new ArrayList<>();
+        List<String> having = new ArrayList<>();
         SortedMap<Integer, String> orderByInside = new TreeMap<>();
 
         log.info("countQuery => [{}]", countQuery);
@@ -151,19 +143,25 @@ public class DataService {
         MapSqlParameterSource params = new MapSqlParameterSource();
         params.addValue("pageSize", pageable.getPageSize());
         params.addValue("offset", pageable.getOffset());
+        params.addValue("userId", userId);
+        params.addValue("userRoles", userRoles);
+        // ARRAY(SELECT json_array_elements_text(({0})::json)) && array[ :userRoles ]::text[]
+        // ({0})::jsonb @> '[ :userId ]'
 
         char prevJoinCode;
         char nextJoinCode = 'a';
         char fieldJoinCode = 'b';
-        Boolean linkBackExist = fields.stream().anyMatch(o -> o.getType().equals("linkBack"));
+        List<String> aggregateTypes = Arrays.asList("linkBack", "customAggregate");
+//        Boolean linkBackExist = fields.stream().anyMatch(o -> o.getType().equals("linkBack") || o.getType().equals("aggregate"));
+        Boolean linkBackExist = fields.stream().anyMatch(o -> aggregateTypes.contains(o.getTypeField()));
 
         for(ConfigField field : fields){
 
             // Если поле не row_number
             if(!field.getName().equals("row_number")) {
 
-                // Если поле содержит ссылку или тип - обратная ссылка
-                if (field.getLinkPath() != null || field.getType().equals("linkBack")) {
+                // Если поле содержит ссылку - создаем каскад join-ов
+                if (field.getLinkPath() != null) {
 
                     // public.highway.id.highway_id/public.generation_object.id.generation_object_id
                     // public.generation_object.id.generation_object_id.full_name
@@ -226,33 +224,49 @@ public class DataService {
 
                             // Добавить JOIN в хранилище
                             joinTables.add(new JoinTable(nextJoinCode, compare, localJoin));
-
                         }
 
                         // Поле для вывода (поле источника данных)
                         if(i == joinObjs.length - 1) {
-
-                            // Получение поля вывода
-                            field.setLinkView(field.getLinkView());
-
-                            // Добавить поле
-                            if(field.getType().equals("linkBack"))
-                                sourceFields.add(String.format("\n string_agg(%s.%s, ', ') as %s", fieldJoinCode, field.getLinkView(), field.getAliasOrName() ));
-                            else {
-                                sourceFields.add(String.format("\n %s.%s as %s", fieldJoinCode, field.getLinkView(), field.getAliasOrName() ));
-                                if(linkBackExist)
-                                    groupBy.add(String.format("\n %s.%s", fieldJoinCode, field.getLinkView()));
-                            }
+                            // Тут был блок заполнения sourceFields после создания join
                         }
                     }
                 }
 
-                // Если линейное поле
-                else {
-                    sourceFields.add(String.format("\n a.%s as %s", field.getName(), field.getAliasOrName() ));
-                    if(linkBackExist)
-                        groupBy.add(String.format("\n a.%s", field.getName()));
+                // Добавление поля в список полей в соответствии с типом поля
+                // column, link, linkBack, custom, customAggregate
+                switch (field.getTypeField()){
+                    case "column":
+                        sourceFields.add(String.format("\n a.%s as %s", field.getName(), field.getAliasOrName() ));
+                        break;
+                    case "link":
+                        sourceFields.add(String.format("\n %s.%s as %s", fieldJoinCode, field.getLinkView(), field.getAliasOrName() ));
+                        break;
+                    case "linkBack":
+                        String[] linkViewFields = field.getLinkView().split("/");
+                        List<String> jsonBuildParams = new ArrayList<>();
+                        for (String linkViewField : linkViewFields) {
+                            String[] viewFields = linkViewField.split(":");
+                            if(viewFields.length == 2)
+                                jsonBuildParams.add(String.format("'%s', %s.%s", viewFields[0], fieldJoinCode, viewFields[1].replaceAll("([^_A-Z])([A-Z])", "$1_$2").toLowerCase()));
+                            else
+                                jsonBuildParams.add(String.format("'%s', %s.%s", linkViewField, fieldJoinCode, linkViewField.replaceAll("([^_A-Z])([A-Z])", "$1_$2").toLowerCase()));
+                        }
+                        sourceFields.add(String.format("\n json_agg(json_build_object(%s)) as %s", String.join(", ", jsonBuildParams), field.getAliasOrName()));
+                        break;
+
+                    case "custom":
+                    case "customAggregate":
+                        sourceFields.add(String.format("\n %s as %s", getCustomFieldName(field, fieldJoinCode), field.getAliasOrName()));
+                        break;
                 }
+
+                if(!aggregateTypes.contains(field.getTypeField()))
+                    if(linkBackExist)
+                        if(field.getLinkPath() != null)
+                            groupBy.add(String.format("\n %s.%s", fieldJoinCode, field.getLinkView()));
+                        else
+                            groupBy.add(String.format("\n a.%s", field.getName()));
 
                 // and {0} = 13
                 // and {0} = 5
@@ -293,6 +307,8 @@ public class DataService {
                                 boolean paramOnly = filterSigns[i].equals("paramOnly");
                                 String whereFieldName;
                                 String whereParamName;
+
+                                // Опеределяем имя поля и имя параметра
                                 if (field.getLinkPath() != null) {
                                     whereFieldName = String.format("%s.%s", fieldJoinCode, field.getLinkView());
                                     whereParamName = String.format("%s.%s.%s", fieldJoinCode, field.getLinkView(), filterFields[i]);
@@ -301,106 +317,53 @@ public class DataService {
                                     whereParamName = String.format("a.%s.%s", field.getAliasOrName(), filterFields[i]);
                                 }
 
+                                // Меняем имя поля если тип "aggregate" или "math"
+                                if(field.getTypeField().equals("custom") || field.getTypeField().equals("customAggregate")) {
+                                    whereFieldName = getCustomFieldName(field, fieldJoinCode);
+                                }
 
-                                /**
-                                 * Если массив и знак массива
-                                 *      Делаем строку запроса
-                                 *      Оперделяем тип и собираем массив
-                                 * Иначе
-                                 *      Если значение null
-                                 *          Формируем только строку запросы
-                                 *      Иначе
-                                 *          Делаем строку запроса
-                                 *          Определение типа занчения и приведение типа
-                                 */
+                                // Если только параметр, то задать имя параметра от пользователя
+                                if(paramOnly)
+                                    whereParamName = String.format("%s", filterFields[i]);
 
+                                /** Если массив */
                                 if(filter.get(filterFields[i]).isArray()) {
                                     ArrayNode jsonNodes = (ArrayNode) filter.get(filterFields[i]);
-                                    List<Object> values = new ArrayList<>();
 
-                                    switch (field.getType()) {
-                                        case "uuid":
-                                            for (JsonNode jsonNode : jsonNodes)
-                                                if(!jsonNode.isNull())
-                                                    values.add(UUID.fromString(jsonNode.asText()));
-                                            params.addValue(whereParamName, values);
-                                            break;
-                                        case "text":
-                                            for (JsonNode jsonNode : jsonNodes)
-                                                if(!jsonNode.isNull())
-                                                    values.add(jsonNode.asText());
-                                            params.addValue(whereParamName, values);
-                                            break;
-                                        case "int":
-                                            for (JsonNode jsonNode : jsonNodes)
-                                                if(!jsonNode.isNull())
-                                                    values.add(jsonNode.asLong());
-                                            params.addValue(whereParamName, values);
-                                            break;
-                                        case "double":
-                                            for (JsonNode jsonNode : jsonNodes)
-                                                if(!jsonNode.isNull())
-                                                    values.add(jsonNode.asDouble());
-                                            params.addValue(whereParamName, values);
-                                            break;
-                                    }
+                                    // Оперделяем тип и собираем массив
+                                    List<Object> values = typeConverter.getListObjectsByType(field.getTypeData(), jsonNodes);
+
+                                    params.addValue(whereParamName, values);
+
+                                    // Делаем строку запроса, если массив не пустой
                                     if(values.size() > 0 && !paramOnly)
-                                        filterOutside.add(String.format(" and %s %s (:%s) \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
+                                        setWhereOrHaving(field, filterOutside, having, String.format(" and %s %s (:%s) \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
+//                                        filterOutside.add(String.format(" and %s %s (:%s) \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
 
                                 } else {
-                                    /**
-                                     *  +++ uuid
-                                     *  +++ varchar
-                                     *  +++ int8 / long
-                                     *  +++ int4 / integer
-                                     *   ++ timestamptz
-                                     *   ++ time
-                                     *   ++ bool
-                                     *  +++ numeric / decimal / double
-                                     */
-
+                                    // Если значение null
                                     if(filter.get(filterFields[i]).isNull()){
                                         if(!paramOnly)
-                                            filterOutside.add(String.format(" and %s %s null \n", whereFieldName, filterSigns[i].toLowerCase()));
-                                    }else {
+                                            if(filterSigns[i].toLowerCase().equals("="))
+                                                setWhereOrHaving(field, filterOutside, having, String.format(" and %s is null \n", whereFieldName));
+//                                                filterOutside.add(String.format(" and %s is null \n", whereFieldName));
+                                            else
+                                                setWhereOrHaving(field, filterOutside, having, String.format(" and %s is not null \n", whereFieldName));
+//                                                filterOutside.add(String.format(" and %s is not null \n", whereFieldName));
+                                    } else {
+                                        // Делаем строку запроса
                                         if(!paramOnly)
-                                            filterOutside.add(String.format(" and %s %s :%s \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
-                                        switch (field.getType()) {
-                                            case "uuid":
-                                                params.addValue(whereParamName, UUID.fromString(filter.get(filterFields[i]).asText()));
-                                                break;
-                                            case "text":
-                                                if (filterSigns[i].toLowerCase().equals("ilike") || filterSigns[i].toLowerCase().equals("like"))
-                                                    params.addValue(whereParamName, SqlUtils.toSearchString(filter.get(filterFields[i]).textValue()));
-                                                else
-                                                    params.addValue(whereParamName, filter.get(filterFields[i]).asText());
-                                                break;
-                                            case "int":
-                                                params.addValue(whereParamName, filter.get(filterFields[i]).asLong());
-                                                break;
-                                            case "timestamp":
-                                                params.addValue(whereParamName, OffsetDateTime.parse(filter.get(filterFields[i]).asText(), DateTimeFormatter.ISO_OFFSET_DATE_TIME));
-                                                break;
-                                            case "date":
-//                                                try {
-                                                    params.addValue(whereParamName, new Date(OffsetDateTime.parse(filter.get(filterFields[i]).asText(), DateTimeFormatter.ISO_OFFSET_DATE_TIME).toInstant().toEpochMilli()));
-//                                                } catch (ParseException e) {
-//                                                    e.printStackTrace();
-//                                                }
-                                                break;
-                                            case "time":
-                                                params.addValue(whereParamName, OffsetTime.parse(filter.get(filterFields[i]).asText(), DateTimeFormatter.ISO_OFFSET_DATE_TIME));
-                                                break;
-                                            case "bool":
-                                                params.addValue(whereParamName, Boolean.valueOf(filter.get(filterFields[i]).asText()));
-                                                break;
-                                            case "double":
-                                                params.addValue(whereParamName, filter.get(filterFields[i]).asDouble());
-                                                break;
-                                            default:
-                                                params.addValue(whereParamName, filter.get(filterFields[i]).textValue());
+                                            setWhereOrHaving(field, filterOutside, having, String.format(" and %s %s :%s \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
+//                                            filterOutside.add(String.format(" and %s %s :%s \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
 
-                                        }
+                                        // Оперделяем тип и получаем значение
+                                        Object value = typeConverter.getObjectByType(field.getTypeData(), filterFields[i], filter);
+
+                                        // Заносим значение в параметры
+                                        if (filterSigns[i].toLowerCase().equals("ilike") || filterSigns[i].toLowerCase().equals("like"))
+                                            params.addValue(whereParamName, SqlUtils.toSearchString((String)value));
+                                        else
+                                            params.addValue(whereParamName, value);
                                     }
                                 }
                             }
@@ -411,7 +374,12 @@ public class DataService {
                 // Сортировка из конфига по полю
                 if(field.getOrderByInside() != null) {
                     String[] orderByIn = field.getOrderByInside().split("\\.");
-                    orderByInside.put(Integer.valueOf(orderByIn[0]), String.format("%s %s", field.getName(), orderByIn[1]));
+                    if(field.getTypeField().equals("link") || field.getTypeField().equals("linkBack"))
+                        orderByInside.put(Integer.valueOf(orderByIn[0]), String.format("%s.%s %s", fieldJoinCode, field.getName(), orderByIn[1]));
+                    if(field.getTypeField().equals("custom") || field.getTypeField().equals("customAggregate"))
+                        orderByInside.put(Integer.valueOf(orderByIn[0]), String.format("%s %s", getCustomFieldName(field, fieldJoinCode), orderByIn[1]));
+                    else // column
+                        orderByInside.put(Integer.valueOf(orderByIn[0]), String.format("a.%s %s", field.getName(), orderByIn[1]));
                 }
             }
         }
@@ -437,7 +405,7 @@ public class DataService {
             else
                 sql = sql.replaceAll(":SORT_FIELDS", "");
 
-            // Добавили пагинацию в SQL (если pageSize == 0, то ограничение на кол-во не накладывается)
+            // Добавили пагинацию в SQL (если pageSize == 1, то ограничение на кол-во не накладывается)
             if (pageable.getPageSize() != 1)
                 sql = sql.replaceAll( ":PAGEABLE", SQL_PAGEABLE);
             else
@@ -473,6 +441,9 @@ public class DataService {
             if (groupBy.size() > 0)
                 sql.append(String.format(SQL_GROUP_BY, String.join(", ", groupBy)));
 
+            if(having.size() > 0)
+                sql.append(String.format("having 1=1 %s", String.join(", ", having)));
+
             // Добавили сортировку в SQL
             if (orderByInside.size() > 0)
                 sql.append(String.format(SQL_ORDER_BY, String.join(", ", orderByInside.values())));
@@ -496,6 +467,21 @@ public class DataService {
             return (T) dataRepository.getCount(FINAL_SQL, params, Long.class);
         else
             return (T) dataRepository.getTable(FINAL_SQL, params, new DataRowMapper(configTable));
+    }
+
+    private void setWhereOrHaving(ConfigField field, List<String> where, List<String> having, String param) {
+        if(field.getTypeField().equals("customAggregate")){
+            having.add(param);
+        } else {
+            where.add(param);
+        }
+    }
+
+    private String getCustomFieldName(ConfigField field, char fieldJoinCode){
+        String expression = field.getName();
+        expression = expression.replaceAll("\\{0\\}", "a");
+        expression = expression.replaceAll("\\{1\\}", String.valueOf(fieldJoinCode));
+        return expression;
     }
 
     private List<ObjectNode> getHierarchicalData(List<ObjectNode> flatData, String hierarchyField) {

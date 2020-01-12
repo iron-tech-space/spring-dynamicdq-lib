@@ -1,6 +1,5 @@
 package com.irontechspace.dynamicdq.repository.RowMapper;
 
-
 import com.irontechspace.dynamicdq.model.ConfigField;
 import com.irontechspace.dynamicdq.model.ConfigTable;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,7 +32,7 @@ public class DataRowMapper implements RowMapper<ObjectNode> {
             if(whiteListNames.contains(field.getAliasOrName()) || field.getVisible()) {
                 String fieldName = field.getAliasOrName();
 
-                switch (field.getType()) {
+                switch (field.getTypeData()) {
                     case "uuid":
                     case "text":
                         rowObject.put(fieldName, rs.getString(fieldName));
