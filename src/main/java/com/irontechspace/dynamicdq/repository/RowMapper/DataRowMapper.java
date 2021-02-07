@@ -1,5 +1,8 @@
 package com.irontechspace.dynamicdq.repository.RowMapper;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import com.irontechspace.dynamicdq.model.ConfigField;
 import com.irontechspace.dynamicdq.model.ConfigTable;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,9 +19,11 @@ import java.util.List;
 @Log4j2
 public class DataRowMapper implements RowMapper<ObjectNode> {
 
-    private ConfigTable configTable;
+    private final ConfigTable configTable;
 
-    private List<String> whiteListNames; //  = Arrays.asList("id", "parent_id");
+    private final List<String> whiteListNames; //  = Arrays.asList("id", "parent_id");
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DataRowMapper(ConfigTable configTable){
         this.configTable = configTable;
@@ -36,6 +41,18 @@ public class DataRowMapper implements RowMapper<ObjectNode> {
                     case "uuid":
                     case "text":
                         rowObject.put(fieldName, rs.getString(fieldName));
+                        break;
+                    case "json":
+                        try {
+                            String value = rs.getString(fieldName);
+                            if(value != null)
+                                rowObject.put(fieldName, objectMapper.readTree(value));
+                            else
+                                rowObject.put(fieldName, objectMapper.nullNode());
+                        } catch (JsonProcessingException e) {
+                            e.printStackTrace();
+                            rowObject.put(fieldName, objectMapper.nullNode());
+                        }
                         break;
                     case "int":
                         rowObject.put(fieldName, rs.getLong(fieldName));

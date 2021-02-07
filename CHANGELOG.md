@@ -1,3 +1,7 @@
+## 0.0.31
+
+- Add `json` type data
+
 ## 0.0.30
 
 - Fix set params `userId` and `userRoles` in **saveService**
