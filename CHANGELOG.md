@@ -1,6 +1,11 @@
+## 0.0.32
+
+- Add `json` type data for SET data
+- Fix GET timestamp type
+
 ## 0.0.31
 
-- Add `json` type data
+- Add `json` type data for GET data
 
 ## 0.0.30
 

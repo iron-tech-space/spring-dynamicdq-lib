@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 @ControllerAdvice
@@ -46,6 +47,7 @@ public class DefaultAdvice
             BindException.class,
             NoHandlerFoundException.class,
             AsyncRequestTimeoutException.class,
+            ResponseStatusException.class,
 
             /** DYNAMICDQ EXCEPTION */
             IllegalArgumentException.class,
@@ -91,6 +93,9 @@ public class DefaultAdvice
             return getEntity(HttpStatus.NOT_FOUND, ex.getMessage(), ex.getStackTrace());
         else if (ex instanceof AsyncRequestTimeoutException)
             return getEntity(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), ex.getStackTrace());
+        else if (ex instanceof ResponseStatusException)
+            return getEntity(((ResponseStatusException) ex).getStatus(), ((ResponseStatusException) ex).getReason(), ex.getStackTrace());
+
 
         /** DYNAMICDQ EXCEPTION */
         else if (ex instanceof IllegalArgumentException)

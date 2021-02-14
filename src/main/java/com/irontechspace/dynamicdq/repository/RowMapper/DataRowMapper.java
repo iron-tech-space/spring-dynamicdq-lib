@@ -12,8 +12,13 @@ import org.springframework.jdbc.core.RowMapper;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 @Log4j2
@@ -24,6 +29,8 @@ public class DataRowMapper implements RowMapper<ObjectNode> {
     private final List<String> whiteListNames; //  = Arrays.asList("id", "parent_id");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
 
     public DataRowMapper(ConfigTable configTable){
         this.configTable = configTable;
@@ -58,10 +65,10 @@ public class DataRowMapper implements RowMapper<ObjectNode> {
                         rowObject.put(fieldName, rs.getLong(fieldName));
                         break;
                     case "timestamp":
-                        rowObject.put(fieldName,
-                                rs.getTimestamp(fieldName) != null ?
-                                        rs.getTimestamp(fieldName).toLocalDateTime().toString() :
-                                        null);
+                        if(rs.getTimestamp(fieldName) != null)
+                            rowObject.put(fieldName, dateFormatter.format(rs.getTimestamp(fieldName)));
+                        else
+                            rowObject.put(fieldName, objectMapper.nullNode());
                         break;
                     case "time":
                         rowObject.put(fieldName,

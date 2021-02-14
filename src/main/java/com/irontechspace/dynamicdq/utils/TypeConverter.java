@@ -60,6 +60,8 @@ public class TypeConverter {
                 return UUID.fromString(dataObject.get(field).asText());
             case "text":
                 return dataObject.get(field).asText();
+            case "json":
+                return dataObject.get(field).toPrettyString();
             case "int":
             case "aggregate":
             case "math":
