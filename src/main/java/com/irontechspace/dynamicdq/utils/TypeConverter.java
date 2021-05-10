@@ -50,8 +50,6 @@ public class TypeConverter {
     }
 
     public Object getObjectByType (String type, String field, JsonNode dataObject, Object parentResult){
-        // boolean has = dataObject.has(field);
-        // boolean isNull = dataObject.get(field).isNull();
         if(!type.equals("parentResult") && (!dataObject.has(field) || dataObject.get(field).isNull()))
             return null;
 
@@ -82,7 +80,6 @@ public class TypeConverter {
                 return new BCryptPasswordEncoder().encode(dataObject.get(field).asText());
             default:
                 return dataObject.get(field).textValue();
-
         }
     }
 }

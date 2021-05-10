@@ -1,8 +1,10 @@
 package com.irontechspace.dynamicdq.service;
 
-import com.irontechspace.dynamicdq.model.SaveData.Field;
-import com.irontechspace.dynamicdq.model.SaveData.Logic;
-import com.irontechspace.dynamicdq.repository.DataRepository;
+import com.irontechspace.dynamicdq.exceptions.NotFoundException;
+import com.irontechspace.dynamicdq.model.Save.SaveConfig;
+import com.irontechspace.dynamicdq.model.Save.SaveField;
+import com.irontechspace.dynamicdq.model.Save.SaveLogic;
+import com.irontechspace.dynamicdq.repository.QueryRepository;
 import com.irontechspace.dynamicdq.model.TypeSql;
 import com.irontechspace.dynamicdq.utils.TypeConverter;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -28,62 +30,61 @@ public class SaveDataService {
     SaveConfigService saveConfigService;
 
     @Autowired
-    DataRepository dataRepository;
+    QueryRepository queryRepository;
 
     @Autowired
     TypeConverter typeConverter;
 
     @Transactional
     public Object saveData(String configName, UUID userId, List<String> userRoles, JsonNode dataObject) {
-
         ObjectMapper objectMapper = new ObjectMapper();
         Object result = null;
         try {
-            String logicJson = saveConfigService.getSaveConfigByConfigName(configName, userId, userRoles);
-            Logic logic = objectMapper.readValue(logicJson, Logic.class);
-            result = analysisLogic(logic, dataObject, null, userId, userRoles);
+            SaveConfig saveConfig = saveConfigService.getByName(configName, userId, userRoles);
+            SaveLogic saveLogic = objectMapper.readValue(saveConfig.getLogic(), SaveLogic.class);
+            result = analysisLogic(saveLogic, dataObject, null, userId, userRoles);
         } catch (JsonProcessingException e){
             e.printStackTrace();
         }
         return result;
     }
 
-    private Object analysisLogic(Logic logic, JsonNode dataObject, Object parentResult, UUID userId, List<String> userRoles) {
+    private Object analysisLogic(SaveLogic saveLogic, JsonNode dataObject, Object parentResult, UUID userId, List<String> userRoles) {
         // Если элемент вложенной логики - массив
-        if (logic.getFieldType().equals("array")) {
-            if (dataObject.has(logic.getFieldName()) && dataObject.get(logic.getFieldName()).getNodeType() == JsonNodeType.ARRAY) {
+        if (saveLogic.getFieldType().equals("array")) {
+            if (dataObject.has(saveLogic.getFieldName()) && dataObject.get(saveLogic.getFieldName()).getNodeType() == JsonNodeType.ARRAY) {
                 List<Object> results = new ArrayList<>();
                 Object subResult = null;
-                for (JsonNode data : dataObject.get(logic.getFieldName())) {
-                    subResult = save(logic, data, parentResult, userId, userRoles);
+                for (JsonNode data : dataObject.get(saveLogic.getFieldName())) {
+                    subResult = save(saveLogic, data, parentResult, userId, userRoles);
                     results.add(subResult);
                     if(data.has("children") && data.get("children").isArray() && data.get("children").size() > 0){
                         ObjectNode children = new ObjectMapper().createObjectNode();
-                        children.put(logic.getFieldName(), data.get("children"));
-                        analysisLogic(logic, children, subResult, userId, userRoles);
+                        children.put(saveLogic.getFieldName(), data.get("children"));
+                        analysisLogic(saveLogic, children, subResult, userId, userRoles);
                     }
                 }
-                deleteRecursive(logic, results, parentResult);
+                deleteRecursive(saveLogic, results, parentResult);
                 return results;
             } else {
-                //TODO вернуть ошибку, что описанной логики не найдено во объекте сохранения
-                return null;
+                // TODO вернуть ошибку, что описанной логики не найдено во объекте сохранения
+                throw new NotFoundException(String.format("Не найдено массива с именем [%s]", saveLogic.getFieldName()));
             }
-        } else if (logic.getFieldType().equals("root")) {
-            return save(logic, dataObject, parentResult, userId, userRoles);
+        } else if (saveLogic.getFieldType().equals("root")) {
+            return save(saveLogic, dataObject, parentResult, userId, userRoles);
         } else {
-            if(dataObject.has(logic.getFieldName()))
-                return  save(logic, dataObject.get(logic.getFieldName()), parentResult, userId, userRoles);
+            if(dataObject.has(saveLogic.getFieldName()))
+                return save(saveLogic, dataObject.get(saveLogic.getFieldName()), parentResult, userId, userRoles);
             else {
-                //TODO вернуть ошибку, что описанной логики не найдено во объекте сохранения
-                return null;
+                // TODO вернуть ошибку, что описанной логики не найдено во объекте сохранения
+                throw new NotFoundException(String.format("Не найдено логики сохранения с типом [%s]", saveLogic.getFieldType()));
             }
         }
     }
 
-    private Object save(Logic logic, JsonNode dataObject, Object parentResult, UUID userId, List<String> userRoles) {
-        log.info("LOGIC => [{}] = [{}]", logic.getFieldType(), logic.getFieldName());
-        String selectById = generateSql(TypeSql.SELECT_BY_ID, logic.getTableName(), logic.getFields().stream().map(Field::getName).collect(Collectors.toList()), logic.getPrimaryKey(), logic.getExcludePrimaryKey());
+    private Object save(SaveLogic saveLogic, JsonNode dataObject, Object parentResult, UUID userId, List<String> userRoles) {
+        log.info("LOGIC => [{}] = [{}]", saveLogic.getFieldType(), saveLogic.getFieldName());
+        String selectById = generateSql(TypeSql.SELECT_BY_ID, saveLogic.getTableName(), saveLogic.getFields().stream().map(SaveField::getName).collect(Collectors.toList()), saveLogic.getPrimaryKey(), saveLogic.getExcludePrimaryKey());
 
         // Точка сохранения результата select by id
         Object selectObject = null;
@@ -93,60 +94,46 @@ public class SaveDataService {
         Map<String, Object> params;
 
 
-        if(dataObject.has(logic.getPrimaryKey()) && !dataObject.get(logic.getPrimaryKey()).isNull()) {
-            params = getParams(logic.getFields(), dataObject, parentResult, userId, userRoles);
-            selectObject = dataRepository.findByPK(selectById, params, Object.class);
+        if(dataObject.has(saveLogic.getPrimaryKey()) && !dataObject.get(saveLogic.getPrimaryKey()).isNull()) {
+            params = getParams(saveLogic.getFields(), dataObject, parentResult, userId, userRoles);
+            selectObject = queryRepository.findByPK(selectById, params, Object.class);
             log.info("\n DATA: [{}]\n SQL: [{}]\n", params.toString(), selectById);
         }
 
 
         if(selectObject == null) {
-            String insertSql = generateSql(TypeSql.INSERT, logic.getTableName(), logic.getFields().stream().map(Field::getName).collect(Collectors.toList()), logic.getPrimaryKey(), logic.getExcludePrimaryKey());
-            if(logic.getAutoGenerateCode())
-                insertSql = insertSql.replace(":code", generateCodeSql(logic.getTableName()));
-            params = getParams(logic.getFields(), dataObject, parentResult, userId, userRoles);
+            String insertSql = generateSql(TypeSql.INSERT, saveLogic.getTableName(), saveLogic.getFields().stream().map(SaveField::getName).collect(Collectors.toList()), saveLogic.getPrimaryKey(), saveLogic.getExcludePrimaryKey());
+            if(saveLogic.getAutoGenerateCode())
+                insertSql = insertSql.replace(":code", generateCodeSql(saveLogic.getTableName()));
+            params = getParams(saveLogic.getFields(), dataObject, parentResult, userId, userRoles);
 
             // Поиск type для primary key в описанных полях логики.
             // Если не найдено, то UUID
-//            String typePK = logic.getFields().stream().filter(field -> field.getName().equals(logic.getPrimaryKey())).findFirst().orElse(new Field(logic.getPrimaryKey(), "uuid")).getType();
-//
-//            switch (typePK) {
-//                case "uuid":
-//                    result = dataRepository.insert(insertSql, params, UUID.class);
-//                    break;
-//                case "text":
-//                    result = dataRepository.insert(insertSql, params, String.class);
-//                    break;
-//                case "int":
-//                    result = dataRepository.insert(insertSql, params, Long.class);
-//                    break;
-//            }
+            result = queryRepository.insert(insertSql, params, getTypePK(saveLogic));
 
-            result = dataRepository.insert(insertSql, params, getTypePK(logic));
-
-            params.put(logic.getPrimaryKey(), result);
+            params.put(saveLogic.getPrimaryKey(), result);
             log.info("\n DATA: [{}]\n SQL: [{}]\n", params.toString(), insertSql);
         } else {
-            String updateSql = generateSql(TypeSql.UPDATE, logic.getTableName(), logic.getFields().stream().map(Field::getName).collect(Collectors.toList()), logic.getPrimaryKey(), logic.getExcludePrimaryKey());
-            params = getParams(logic.getFields(), dataObject, parentResult, userId, userRoles);
-            result = params.get(logic.getPrimaryKey());
-            dataRepository.update(updateSql, params);
+            String updateSql = generateSql(TypeSql.UPDATE, saveLogic.getTableName(), saveLogic.getFields().stream().map(SaveField::getName).collect(Collectors.toList()), saveLogic.getPrimaryKey(), saveLogic.getExcludePrimaryKey());
+            params = getParams(saveLogic.getFields(), dataObject, parentResult, userId, userRoles);
+            result = params.get(saveLogic.getPrimaryKey());
+            queryRepository.update(updateSql, params);
             log.info("\n DATA: [{}]\n SQL: [{}]\n", params.toString(), updateSql);
         }
 
         if(result != null) {
             // Если существуют вложенные логики
-            if (logic.getChildren() != null && logic.getChildren().size() > 0) {
-                for (Logic childLogic : logic.getChildren()) {
-                    analysisLogic(childLogic, dataObject, result, userId, userRoles);
+            if (saveLogic.getChildren() != null && saveLogic.getChildren().size() > 0) {
+                for (SaveLogic childSaveLogic : saveLogic.getChildren()) {
+                    analysisLogic(childSaveLogic, dataObject, result, userId, userRoles);
                 }
             }
         }
         return result;
     }
 
-    private Class getTypePK (Logic logic){
-        String typePK = logic.getFields().stream().filter(field -> field.getName().equals(logic.getPrimaryKey())).findFirst().orElse(new Field(logic.getPrimaryKey(), "uuid")).getType();
+    private Class getTypePK (SaveLogic saveLogic){
+        String typePK = saveLogic.getFields().stream().filter(saveField -> saveField.getName().equals(saveLogic.getPrimaryKey())).findFirst().orElse(new SaveField(saveLogic.getPrimaryKey(), "uuid")).getType();
         switch (typePK) {
             case "text":
                 return String.class;
@@ -157,56 +144,56 @@ public class SaveDataService {
         }
     }
 
-    private void deleteRecursive(Logic logic, List<Object> excludeResults, Object parentResult){
+    private void deleteRecursive(SaveLogic saveLogic, List<Object> excludeResults, Object parentResult){
 
         String where;
         String selectSql;
         String deleteSql;
         Map<String, Object> params = new HashMap<>();
 
-        Optional<Field> whereDeleteField = logic.getFields().stream().filter(field -> field.getType().equals("parentResult")).findFirst();
+        Optional<SaveField> whereDeleteField = saveLogic.getFields().stream().filter(saveField -> saveField.getType().equals("parentResult")).findFirst();
         if(whereDeleteField.isPresent()){
             // Если исключать есть что, то добавляем в SQL
             if(excludeResults.size() > 0) {
                 where = String.format("%s=:%s and %s not in (:%s)",
                         whereDeleteField.get().getName().replaceAll("([^_A-Z])([A-Z])", "$1_$2").toLowerCase(),
                         whereDeleteField.get().getName(),
-                        logic.getPrimaryKey().replaceAll("([^_A-Z])([A-Z])", "$1_$2").toLowerCase(),
-                        logic.getPrimaryKey());
+                        saveLogic.getPrimaryKey().replaceAll("([^_A-Z])([A-Z])", "$1_$2").toLowerCase(),
+                        saveLogic.getPrimaryKey());
 
-                selectSql = getSqlForRecursiveSelect(logic.getTableName(), where, logic.getPrimaryKey());
-                deleteSql = getSqlForRecursiveDelete(logic.getTableName(), where);
+                selectSql = getSqlForRecursiveSelect(saveLogic.getTableName(), where, saveLogic.getPrimaryKey());
+                deleteSql = getSqlForRecursiveDelete(saveLogic.getTableName(), where);
             } else {
                 where = String.format("%s=:%s",
                         whereDeleteField.get().getName().replaceAll("([^_A-Z])([A-Z])", "$1_$2").toLowerCase(),
                         whereDeleteField.get().getName());
-                selectSql = getSqlForRecursiveSelect(logic.getTableName(), where, logic.getPrimaryKey());
-                deleteSql = getSqlForRecursiveDelete(logic.getTableName(), where);
+                selectSql = getSqlForRecursiveSelect(saveLogic.getTableName(), where, saveLogic.getPrimaryKey());
+                deleteSql = getSqlForRecursiveDelete(saveLogic.getTableName(), where);
             }
             params.put(whereDeleteField.get().getName(), parentResult);
-            params.put(logic.getPrimaryKey(), excludeResults);
+            params.put(saveLogic.getPrimaryKey(), excludeResults);
         } else return;
 
-        if (logic.getChildren() != null && logic.getChildren().size() > 0) {
+        if (saveLogic.getChildren() != null && saveLogic.getChildren().size() > 0) {
 
             // Для каждого значения перебрать логики с удалением
-            List<Object> results = dataRepository.getTable(selectSql, params, getTypePK(logic));
+            List<Object> results = queryRepository.getTable(selectSql, params, getTypePK(saveLogic));
             log.info("\n DATA: [{}]\n SQL: [{}]\n", params.toString(), selectSql);
             for (Object result : results) {
-                for (Logic childLogic : logic.getChildren()) {
-                    deleteRecursive(childLogic, new ArrayList<>(), result);
+                for (SaveLogic childSaveLogic : saveLogic.getChildren()) {
+                    deleteRecursive(childSaveLogic, new ArrayList<>(), result);
                 }
             }
         }
-        dataRepository.delete(deleteSql, params);
+        queryRepository.delete(deleteSql, params);
         log.info("\n DATA: [{}]\n SQL: [{}]\n", params.toString(), deleteSql);
 
     }
 
-    private Map<String, Object> getParams(List<Field> fields, JsonNode dataObject, Object parentResult, UUID userId, List<String> userRoles){
+    private Map<String, Object> getParams(List<SaveField> saveFields, JsonNode dataObject, Object parentResult, UUID userId, List<String> userRoles){
         Map<String, Object> params = new HashMap<>();
-        for(Field field : fields){
-            params.put(field.getName(), getParamByType(field.getType(), field.getName(), dataObject, parentResult));
+        for(SaveField saveField : saveFields){
+            params.put(saveField.getName(), getParamByType(saveField.getType(), saveField.getName(), dataObject, parentResult));
         }
         params.putIfAbsent("userId", userId);
         params.putIfAbsent("userRoles", userRoles);

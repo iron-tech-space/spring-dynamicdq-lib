@@ -1,5 +1,6 @@
-package com.irontechspace.dynamicdq.model;
+package com.irontechspace.dynamicdq.model.Query;
 
+import com.irontechspace.dynamicdq.model.Config;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,19 +13,12 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ConfigTable {
-    private UUID id;
-    private UUID userId;
-    private String configName;
+public class QueryConfig extends Config {
     private String tableName;
-    private String description;
-    private Long position;
     private Boolean hierarchical;
     private String hierarchyField;
     private String hierarchyView;
     private Boolean hierarchyLazyLoad;
     private String customSql;
-    private String sharedForUsers;
-    private String sharedForRoles;
-    private List<ConfigField> fields;
+    private List<QueryField> fields;
 }

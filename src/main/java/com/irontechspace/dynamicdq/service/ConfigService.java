@@ -1,87 +1,65 @@
 package com.irontechspace.dynamicdq.service;
 
 import com.irontechspace.dynamicdq.exceptions.ForbiddenException;
-import com.irontechspace.dynamicdq.model.ConfigTable;
-import com.irontechspace.dynamicdq.model.Db.Field;
-import com.irontechspace.dynamicdq.repository.ConfigRepository;
+import com.irontechspace.dynamicdq.model.Config;
+import com.irontechspace.dynamicdq.repository.Base.IConfigRepository;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Log4j2
-@Service
-public class ConfigService {
+public class ConfigService<T extends Config> {
 
-    private List<ConfigTable> configs;
+    private List<T> configs;
 
-    @Autowired
-    ConfigRepository configRepository;
+    IConfigRepository<T> IConfigRepository;
 
-    @Scheduled(fixedRate = 5000)
-    private void updateConfig(){
-        getConfigs();
-        log.info("#> ConfigService update configs [{}]", configs.size());
+    public ConfigService (IConfigRepository<T> repository) {
+        IConfigRepository = repository;
     }
 
-    @Bean
-    private void initConfigs(){
-        configs = getConfigs();
+    public void loadConfigs(String msg){
+        loadConfigs();
+        log.info("#> {} [{}]", msg, configs.size());
+    }
+    private void loadConfigs(){
+        configs = IConfigRepository.getAll();
     }
 
-    public List<ConfigTable> getConfigs(){
-        return getConfigs(UUID.fromString("0be7f31d-3320-43db-91a5-3c44c99329ab"), Collections.singletonList("ROLE_ADMIN"));
+    public List<T> getAll(UUID userId, List<String> userRoles){
+        return configs.stream().filter(queryConfig -> checkConfig(queryConfig, userId, userRoles)).collect(Collectors.toList());
     }
 
-    public List<ConfigTable> getConfigs(UUID userId, List<String> userRoles){
-//        log.info("Reload configs");
-        return configs = configRepository.getConfigs(userId, userRoles);
+    public T getByName(String configName, UUID userId, List<String> userRoles){
+        for (T queryConfig : configs)
+            if(queryConfig.getConfigName().equals(configName))
+                if(checkConfig(queryConfig, userId, userRoles))
+                    return queryConfig;
+                else
+                    throw new ForbiddenException("Конфигурация недоступна");
+
+        throw new ForbiddenException("Конфигурация не найдена");
     }
 
-    public ConfigTable getConfig(String configName, UUID userId, List<String> userRoles){
-        return configRepository.getConfig(configName, userId, userRoles);
+    public T save(T config){
+        T savedQueryConfig = IConfigRepository.save(config);
+        loadConfigs();
+        return savedQueryConfig;
     }
 
-    public ConfigTable getConfigByConfigName(String configName, UUID userId, List<String> userRoles){
-        for (ConfigTable configTable : configs)
-            if(configTable.getConfigName().equals(configName)
-                    && (configTable.getUserId().equals(userId) || userRoles.stream().anyMatch(role -> configTable.getSharedForRoles() != null && configTable.getSharedForRoles().contains(role))))
-                return configTable;
-
-        throw new ForbiddenException("Конфигурация недоступна");
+    public void delete(UUID configId){
+        IConfigRepository.delete(configId);
+        loadConfigs();
     }
 
-    public ConfigTable save(ConfigTable configTable){
-        ConfigTable savedConfigTable = configRepository.save(configTable);
-        getConfigs();
-        return savedConfigTable;
-    }
-
-    public void deleteTableById(UUID tableId){
-        configRepository.deleteTableById(tableId);
-        getConfigs();
-    }
-
-    public void deleteFieldById(UUID fieldId){
-        configRepository.deleteFieldById(fieldId);
-        getConfigs();
-    }
-
-    public void deleteFieldsByTableId(UUID tableId){
-        configRepository.deleteFieldsByTableId(tableId);
-        getConfigs();
-    }
-
-    public List<String> getDbTables(){
-        return configRepository.getDbTables();
-    }
-
-    public List<Field> getDbFieldsByTable(String tableName) {
-        return configRepository.getDbFieldsByTable(tableName);
+    private Boolean checkConfig(T queryConfig, UUID userId, List<String> userRoles){
+        return  // Проверка на владельца
+                queryConfig.getUserId().equals(userId)
+                // Проверка на доступ по пользователю
+                || (queryConfig.getSharedForUsers() != null && queryConfig.getSharedForUsers().contains(userId.toString()))
+                // Проверка на доступ по роли
+                || userRoles.stream().anyMatch(role -> queryConfig.getSharedForRoles() != null && queryConfig.getSharedForRoles().contains(role));
     }
 }

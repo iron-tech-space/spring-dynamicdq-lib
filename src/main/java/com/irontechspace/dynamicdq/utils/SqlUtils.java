@@ -114,7 +114,7 @@ public class SqlUtils {
         }
     }
 
-    private static <T> List<String> inspect(Class<T> klazz) {
+    public static <T> List<String> inspect(Class<T> klazz) {
         List<Field> fields = getInheritedPrivateFields(klazz);
         List<String> names = new ArrayList<>();
         for (Field field : fields) {

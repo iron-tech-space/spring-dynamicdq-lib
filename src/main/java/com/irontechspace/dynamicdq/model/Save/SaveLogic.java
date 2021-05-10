@@ -1,4 +1,4 @@
-package com.irontechspace.dynamicdq.model.SaveData;
+package com.irontechspace.dynamicdq.model.Save;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -11,7 +11,7 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Logic {
+public class SaveLogic {
 
     // Какое поле обрабатываем
     private String fieldType;
@@ -24,8 +24,8 @@ public class Logic {
     private Boolean excludePrimaryKey;
 
     // Список полей которые надо сохранить
-    private List<Field> fields;
+    private List<SaveField> fields;
 
     // Вложенные объекты логики сохранения
-    private List<Logic> children;
+    private List<SaveLogic> children;
 }

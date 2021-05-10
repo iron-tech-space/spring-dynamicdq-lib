@@ -1,9 +1,9 @@
 package com.irontechspace.dynamicdq.service;
 
-import com.irontechspace.dynamicdq.model.ConfigField;
-import com.irontechspace.dynamicdq.model.ConfigTable;
+import com.irontechspace.dynamicdq.model.Query.QueryField;
+import com.irontechspace.dynamicdq.model.Query.QueryConfig;
 import com.irontechspace.dynamicdq.model.JoinTable;
-import com.irontechspace.dynamicdq.repository.DataRepository;
+import com.irontechspace.dynamicdq.repository.QueryRepository;
 import com.irontechspace.dynamicdq.repository.RowMapper.DataRowMapper;
 import com.irontechspace.dynamicdq.utils.SqlUtils;
 import com.irontechspace.dynamicdq.utils.TypeConverter;
@@ -28,30 +28,29 @@ import static java.util.stream.Collectors.joining;
 public class DataService {
 
     @Autowired
-    ConfigService configService;
+    QueryConfigService queryConfigService;
 
     @Autowired
-    DataRepository dataRepository;
+    QueryRepository queryRepository;
 
     @Autowired
     TypeConverter typeConverter;
 
+    private static final String SQL_SELECT = "\tselect %s ";
 
-    private static final String SQL_SELECT = " select %s ";
+    private static final String SQL_FROM = "\n\tfrom %s a \n";
 
-    private static final String SQL_FROM = "\n from %s a \n";
+    private static final String SQL_JOIN = "\t\tleft join %s %s on %s.%s = %s.%s \n";
 
-    private static final String SQL_JOIN = "\t left join %s %s on %s.%s = %s.%s \n";
+    private static final String SQL_WHERE_1_1 = "\twhere 1=1 \n";
 
-    private static final String SQL_WHERE_1_1 = " where 1=1 \n";
+    private static final String SQL_GROUP_BY = "\tgroup by %s \n";
 
-    private static final String SQL_GROUP_BY = " group by %s \n";
-
-    private static final String SQL_ORDER_BY = " order by %s \n";
+    private static final String SQL_ORDER_BY = "\torder by %s \n";
 
     private static final String SQL_PAGEABLE = "" +
-            " limit :pageSize \n" +
-            " offset :offset \n";
+            "\tlimit :pageSize \n" +
+            "\toffset :offset \n";
 
     private static final String SQL_ROW_NUMBER = "" +
             "row_number() over() + :offset as row_number, ";
@@ -60,39 +59,39 @@ public class DataService {
     /** Получение плоской таблицы данных */
     public List<ObjectNode> getFlatData(String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
 
-        ConfigTable configTable = configService.getConfigByConfigName(configName, userId, userRoles);
+        QueryConfig queryConfig = queryConfigService.getByName(configName, userId, userRoles);
 
-        return getFlatData(configTable, userId, userRoles, filter, pageable);
+        return getFlatData(queryConfig, userId, userRoles, filter, pageable);
     }
 
     /** Получение кол-ва данных в плоской таблице */
     public Long getFlatDataCount(String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
 
-        ConfigTable configTable = configService.getConfigByConfigName(configName, userId, userRoles);
+        QueryConfig queryConfig = queryConfigService.getByName(configName, userId, userRoles);
 
-        return getFlatData(configTable, userId, userRoles, filter, pageable, true);
+        return getFlatData(queryConfig, userId, userRoles, filter, pageable, true);
     }
 
     /** Получение иерархической таблицы данных */
     public List<ObjectNode> getHierarchicalData(String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
 
-        ConfigTable configTable = configService.getConfigByConfigName(configName, userId, userRoles);
+        QueryConfig queryConfig = queryConfigService.getByName(configName, userId, userRoles);
 
-        List<ObjectNode> result = getHierarchicalData(getFlatData(configTable, userId, userRoles, filter, pageable), configTable.getHierarchyField());
+        List<ObjectNode> result = getHierarchicalData(getFlatData(queryConfig, userId, userRoles, filter, pageable), queryConfig.getHierarchyField());
 
         // Формирование мапы параметров поиска
         Map<String, Pattern> searchFields = new HashMap<>();
-        for(ConfigField field : configTable.getFields()){
-            if(field.getFilterFields() != null && field.getFilterSigns() != null){
-                String[] filterFields = field.getFilterFields().split("/");
-                String[] filterSigns = field.getFilterSigns().split("/");
+        for(QueryField queryField : queryConfig.getFields()){
+            if(queryField.getFilterFields() != null && queryField.getFilterSigns() != null){
+                String[] filterFields = queryField.getFilterFields().split("/");
+                String[] filterSigns = queryField.getFilterSigns().split("/");
                 if(filterFields.length == filterSigns.length){
                     for (int i = 0; i < filterFields.length; i++) {
                         if (filter.has(filterFields[i])
                                 && (filterSigns[i].toLowerCase().equals("ilike") || filterSigns[i].toLowerCase().equals("like"))) {
-                            log.info("Add searchFields [{}] => {}", field.getAliasOrName(), filter.get(filterFields[i]).asText().replaceAll("\\s", ".+?"));
+                            log.debug("Add searchFields [{}] => {}", queryField.getAliasOrName(), filter.get(filterFields[i]).asText().replaceAll("\\s", ".+?"));
                             searchFields.put(
-                                    field.getAliasOrName(),
+                                    queryField.getAliasOrName(),
                                     Pattern.compile(filter.get(filterFields[i]).asText().replaceAll("\\s", ".+?")));
                         }
                     }
@@ -101,21 +100,21 @@ public class DataService {
         }
         // Если мапа параметров поиска не пустая, то ищем
         if(searchFields.size() > 0) {
-            log.info("Search by tree");
+            log.debug("Search by tree");
             for (int i = result.size() - 1; i >= 0; i--) {
                 if (removeRecursively(result.get(i), searchFields)) {
                     result.remove(i);
                 }
             }
         } else
-            log.info("Skip search by tree");
+            log.debug("Skip search by tree");
         return result;
     }
 
 
     /** Получение RowNumber SQL */
-    private String getRowNumber(List<ConfigField> fields){
-        Optional<ConfigField> rowNumber = fields.stream().filter(o -> o.getName().equals("row_number")).findFirst();
+    private String getRowNumber(List<QueryField> queryFields){
+        Optional<QueryField> rowNumber = queryFields.stream().filter(o -> o.getName().equals("row_number")).findFirst();
         if(rowNumber.isPresent()) {
             return rowNumber.get().getVisible() ? SQL_ROW_NUMBER : "";
         } else {
@@ -123,13 +122,13 @@ public class DataService {
         }
     }
 
-    private List<ObjectNode> getFlatData(ConfigTable configTable, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
-        return getFlatData(configTable, userId, userRoles, filter, pageable, false);
+    private List<ObjectNode> getFlatData(QueryConfig queryConfig, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
+        return getFlatData(queryConfig, userId, userRoles, filter, pageable, false);
     }
 
-    private <T> T getFlatData(ConfigTable configTable, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable, Boolean countQuery) {
+    private <T> T getFlatData(QueryConfig queryConfig, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable, Boolean countQuery) {
 
-        List<ConfigField> fields = configTable.getFields();
+        List<QueryField> queryFields = queryConfig.getFields();
         List<String> sourceFields = new ArrayList<>();
         List<JoinTable> joinTables = new ArrayList<>();
         List<String> filterOutside = new ArrayList<>();
@@ -153,15 +152,15 @@ public class DataService {
         char fieldJoinCode = 'b';
         List<String> aggregateTypes = Arrays.asList("linkBack", "customAggregate");
 //        Boolean linkBackExist = fields.stream().anyMatch(o -> o.getType().equals("linkBack") || o.getType().equals("aggregate"));
-        Boolean linkBackExist = fields.stream().anyMatch(o -> aggregateTypes.contains(o.getTypeField()));
+        Boolean linkBackExist = queryFields.stream().anyMatch(o -> aggregateTypes.contains(o.getTypeField()));
 
-        for(ConfigField field : fields){
+        for(QueryField queryField : queryFields){
 
             // Если поле не row_number
-            if(!field.getName().equals("row_number")) {
+            if(!queryField.getName().equals("row_number")) {
 
                 // Если поле содержит ссылку - создаем каскад join-ов
-                if (field.getLinkPath() != null) {
+                if (queryField.getLinkPath() != null) {
 
                     // public.highway.id.highway_id/public.generation_object.id.generation_object_id
                     // public.generation_object.id.generation_object_id.full_name
@@ -176,7 +175,7 @@ public class DataService {
                      * assd.metering_bundles.id.id_bundle/assd.metering_points.id.id_point/assd.metering_point_types.code.code_type
                      */
 
-                    String[] joinObjs = field.getLinkPath().split("/"); // joinLine.split("/");
+                    String[] joinObjs = queryField.getLinkPath().split("/"); // joinLine.split("/");
 
                     String parentJoinParams = "";
 
@@ -185,7 +184,7 @@ public class DataService {
                         String[] joinObjsParams = joinObjs[i].split("\\.");
 
                         if(i == 0)
-                            parentJoinParams = String.format("%s", configTable.getTableName());
+                            parentJoinParams = String.format("%s", queryConfig.getTableName());
                         else
                             parentJoinParams = joinObjs[i-1];
 
@@ -235,15 +234,15 @@ public class DataService {
 
                 // Добавление поля в список полей в соответствии с типом поля
                 // column, link, linkBack, custom, customAggregate
-                switch (field.getTypeField()){
+                switch (queryField.getTypeField()){
                     case "column":
-                        sourceFields.add(String.format("\n a.%s as %s", field.getName(), field.getAliasOrName() ));
+                        sourceFields.add(String.format("\n a.%s as %s", queryField.getName(), queryField.getAliasOrName() ));
                         break;
                     case "link":
-                        sourceFields.add(String.format("\n %s.%s as %s", fieldJoinCode, field.getLinkView(), field.getAliasOrName() ));
+                        sourceFields.add(String.format("\n %s.%s as %s", fieldJoinCode, queryField.getLinkView(), queryField.getAliasOrName() ));
                         break;
                     case "linkBack":
-                        String[] linkViewFields = field.getLinkView().split("/");
+                        String[] linkViewFields = queryField.getLinkView().split("/");
                         List<String> jsonBuildParams = new ArrayList<>();
                         for (String linkViewField : linkViewFields) {
                             String[] viewFields = linkViewField.split(":");
@@ -252,21 +251,21 @@ public class DataService {
                             else
                                 jsonBuildParams.add(String.format("'%s', %s.%s", linkViewField, fieldJoinCode, linkViewField.replaceAll("([^_A-Z])([A-Z])", "$1_$2").toLowerCase()));
                         }
-                        sourceFields.add(String.format("\n json_agg(json_build_object(%s)) as %s", String.join(", ", jsonBuildParams), field.getAliasOrName()));
+                        sourceFields.add(String.format("\n json_agg(json_build_object(%s)) as %s", String.join(", ", jsonBuildParams), queryField.getAliasOrName()));
                         break;
 
                     case "custom":
                     case "customAggregate":
-                        sourceFields.add(String.format("\n %s as %s", getCustomFieldName(field, fieldJoinCode), field.getAliasOrName()));
+                        sourceFields.add(String.format("\n %s as %s", getCustomFieldName(queryField, fieldJoinCode), queryField.getAliasOrName()));
                         break;
                 }
 
-                if(!aggregateTypes.contains(field.getTypeField()))
+                if(!aggregateTypes.contains(queryField.getTypeField()))
                     if(linkBackExist)
-                        if(field.getLinkPath() != null)
-                            groupBy.add(String.format("\n %s.%s", fieldJoinCode, field.getLinkView()));
+                        if(queryField.getLinkPath() != null)
+                            groupBy.add(String.format("\n %s.%s", fieldJoinCode, queryField.getLinkView()));
                         else
-                            groupBy.add(String.format("\n a.%s", field.getName()));
+                            groupBy.add(String.format("\n a.%s", queryField.getName()));
 
                 // and {0} = 13
                 // and {0} = 5
@@ -275,10 +274,10 @@ public class DataService {
                 // Фильтрация по полю (системная = дефолтная)
                 // {0} = 5 transform to a.[name] = 5
                 // {1} = 5 transform to [JoinCode].[LinkView] = 5
-                if(field.getFilterInside() != null){
-                    String whereInside = field.getFilterInside();
-                    whereInside = whereInside.replaceAll("\\{0\\}", String.format("a.%s", field.getName()));
-                    whereInside = whereInside.replaceAll("\\{1\\}", String.format("%s.%s", fieldJoinCode, field.getLinkView()));
+                if(queryField.getFilterInside() != null){
+                    String whereInside = queryField.getFilterInside();
+                    whereInside = whereInside.replaceAll("\\{0\\}", String.format("a.%s", queryField.getName()));
+                    whereInside = whereInside.replaceAll("\\{1\\}", String.format("%s.%s", fieldJoinCode, queryField.getLinkView()));
                     if(whereInside.startsWith("and"))
                         filterOutside.add(String.format(" %s \n", whereInside));
                     else
@@ -288,16 +287,16 @@ public class DataService {
 
 
                 // Фильтрация по полю (пользовательская)
-                if(field.getFilterFields() != null && field.getFilterSigns() != null){
-                    String[] filterFields = field.getFilterFields().split("/");
-                    String[] filterSigns = field.getFilterSigns().split("/");
+                if(queryField.getFilterFields() != null && queryField.getFilterSigns() != null){
+                    String[] filterFields = queryField.getFilterFields().split("/");
+                    String[] filterSigns = queryField.getFilterSigns().split("/");
 
                     // Если кол-ва параметров фильтрации равны, то фильтруем
                     if(filterFields.length == filterSigns.length){
 
                         for (int i = 0; i < filterFields.length; i++){
 
-                            if(configTable.getHierarchical() != null && configTable.getHierarchical()
+                            if(queryConfig.getHierarchical() != null && queryConfig.getHierarchical()
                                 && (filterSigns[i].toLowerCase().equals("ilike") || filterSigns[i].toLowerCase().equals("like"))){
                                 log.info("Skip like filter");
                                 continue;
@@ -309,17 +308,17 @@ public class DataService {
                                 String whereParamName;
 
                                 // Опеределяем имя поля и имя параметра
-                                if (field.getLinkPath() != null) {
-                                    whereFieldName = String.format("%s.%s", fieldJoinCode, field.getLinkView());
-                                    whereParamName = String.format("%s.%s.%s", fieldJoinCode, field.getLinkView(), filterFields[i]);
+                                if (queryField.getLinkPath() != null) {
+                                    whereFieldName = String.format("%s.%s", fieldJoinCode, queryField.getLinkView());
+                                    whereParamName = String.format("%s.%s.%s", fieldJoinCode, queryField.getLinkView(), filterFields[i]);
                                 } else {
-                                    whereFieldName = String.format("a.%s", field.getName());
-                                    whereParamName = String.format("a.%s.%s", field.getAliasOrName(), filterFields[i]);
+                                    whereFieldName = String.format("a.%s", queryField.getName());
+                                    whereParamName = String.format("a.%s.%s", queryField.getAliasOrName(), filterFields[i]);
                                 }
 
                                 // Меняем имя поля если тип "aggregate" или "math"
-                                if(field.getTypeField().equals("custom") || field.getTypeField().equals("customAggregate")) {
-                                    whereFieldName = getCustomFieldName(field, fieldJoinCode);
+                                if(queryField.getTypeField().equals("custom") || queryField.getTypeField().equals("customAggregate")) {
+                                    whereFieldName = getCustomFieldName(queryField, fieldJoinCode);
                                 }
 
                                 // Если только параметр, то задать имя параметра от пользователя
@@ -331,13 +330,13 @@ public class DataService {
                                     ArrayNode jsonNodes = (ArrayNode) filter.get(filterFields[i]);
 
                                     // Оперделяем тип и собираем массив
-                                    List<Object> values = typeConverter.getListObjectsByType(field.getTypeData(), jsonNodes);
+                                    List<Object> values = typeConverter.getListObjectsByType(queryField.getTypeData(), jsonNodes);
 
                                     params.addValue(whereParamName, values);
 
                                     // Делаем строку запроса, если массив не пустой
                                     if(values.size() > 0 && !paramOnly)
-                                        setWhereOrHaving(field, filterOutside, having, String.format(" and %s %s (:%s) \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
+                                        setWhereOrHaving(queryField, filterOutside, having, String.format(" and %s %s (:%s) \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
 //                                        filterOutside.add(String.format(" and %s %s (:%s) \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
 
                                 } else {
@@ -345,19 +344,19 @@ public class DataService {
                                     if(filter.get(filterFields[i]).isNull()){
                                         if(!paramOnly)
                                             if(filterSigns[i].toLowerCase().equals("="))
-                                                setWhereOrHaving(field, filterOutside, having, String.format(" and %s is null \n", whereFieldName));
+                                                setWhereOrHaving(queryField, filterOutside, having, String.format(" and %s is null \n", whereFieldName));
 //                                                filterOutside.add(String.format(" and %s is null \n", whereFieldName));
                                             else
-                                                setWhereOrHaving(field, filterOutside, having, String.format(" and %s is not null \n", whereFieldName));
+                                                setWhereOrHaving(queryField, filterOutside, having, String.format(" and %s is not null \n", whereFieldName));
 //                                                filterOutside.add(String.format(" and %s is not null \n", whereFieldName));
                                     } else {
                                         // Делаем строку запроса
                                         if(!paramOnly)
-                                            setWhereOrHaving(field, filterOutside, having, String.format(" and %s %s :%s \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
+                                            setWhereOrHaving(queryField, filterOutside, having, String.format(" and %s %s :%s \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
 //                                            filterOutside.add(String.format(" and %s %s :%s \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
 
                                         // Оперделяем тип и получаем значение
-                                        Object value = typeConverter.getObjectByType(field.getTypeData(), filterFields[i], filter);
+                                        Object value = typeConverter.getObjectByType(queryField.getTypeData(), filterFields[i], filter);
 
                                         // Заносим значение в параметры
                                         if (filterSigns[i].toLowerCase().equals("ilike") || filterSigns[i].toLowerCase().equals("like"))
@@ -372,14 +371,14 @@ public class DataService {
                 }
 
                 // Сортировка из конфига по полю
-                if(field.getOrderByInside() != null) {
-                    String[] orderByIn = field.getOrderByInside().split("\\.");
-                    if(field.getTypeField().equals("link") || field.getTypeField().equals("linkBack"))
-                        orderByInside.put(Integer.valueOf(orderByIn[0]), String.format("%s.%s %s", fieldJoinCode, field.getName(), orderByIn[1]));
-                    if(field.getTypeField().equals("custom") || field.getTypeField().equals("customAggregate"))
-                        orderByInside.put(Integer.valueOf(orderByIn[0]), String.format("%s %s", getCustomFieldName(field, fieldJoinCode), orderByIn[1]));
+                if(queryField.getOrderByInside() != null) {
+                    String[] orderByIn = queryField.getOrderByInside().split("\\.");
+                    if(queryField.getTypeField().equals("link") || queryField.getTypeField().equals("linkBack"))
+                        orderByInside.put(Integer.valueOf(orderByIn[0]), String.format("%s.%s %s", fieldJoinCode, queryField.getName(), orderByIn[1]));
+                    if(queryField.getTypeField().equals("custom") || queryField.getTypeField().equals("customAggregate"))
+                        orderByInside.put(Integer.valueOf(orderByIn[0]), String.format("%s %s", getCustomFieldName(queryField, fieldJoinCode), orderByIn[1]));
                     else // column
-                        orderByInside.put(Integer.valueOf(orderByIn[0]), String.format("a.%s %s", field.getName(), orderByIn[1]));
+                        orderByInside.put(Integer.valueOf(orderByIn[0]), String.format("a.%s %s", queryField.getName(), orderByIn[1]));
                 }
             }
         }
@@ -390,8 +389,8 @@ public class DataService {
 
 
         String FINAL_SQL;
-        if(configTable.getCustomSql() != null){
-            String sql = configTable.getCustomSql();
+        if(queryConfig.getCustomSql() != null){
+            String sql = queryConfig.getCustomSql();
 
             // Добавили фильтры в SQL
             if (filterOutside.size() > 0)
@@ -425,7 +424,7 @@ public class DataService {
             sql.append(String.format(SQL_SELECT, String.join(", ", sourceFields)));
 
             // Добавили таблицу для выборки
-            sql.append(String.format(SQL_FROM, configTable.getTableName()));
+            sql.append(String.format(SQL_FROM, queryConfig.getTableName()));
 
             // Добавили JOIN-ы для выборки
             sql.append(joinTables.stream().map(JoinTable::getJoin).collect(Collectors.joining("")));
@@ -456,7 +455,7 @@ public class DataService {
             if(countQuery)
                 sql.append(") \nselect count(t.*) from t \n");
             else
-                sql.append(String.format(") \nselect %s t.* from t \n", getRowNumber(fields)));
+                sql.append(String.format(") \nselect %s t.* from t \n", getRowNumber(queryFields)));
 
             // log.debug(ob);
             log.debug("Before repository pageSize: [{}], offset: [{}] -> \n{}", pageable.getPageSize(), pageable.getOffset(), sql.toString());
@@ -464,21 +463,21 @@ public class DataService {
         }
 
         if(countQuery)
-            return (T) dataRepository.getCount(FINAL_SQL, params, Long.class);
+            return (T) queryRepository.getCount(FINAL_SQL, params, Long.class);
         else
-            return (T) dataRepository.getTable(FINAL_SQL, params, new DataRowMapper(configTable));
+            return (T) queryRepository.getTable(FINAL_SQL, params, new DataRowMapper(queryConfig));
     }
 
-    private void setWhereOrHaving(ConfigField field, List<String> where, List<String> having, String param) {
-        if(field.getTypeField().equals("customAggregate")){
+    private void setWhereOrHaving(QueryField queryField, List<String> where, List<String> having, String param) {
+        if(queryField.getTypeField().equals("customAggregate")){
             having.add(param);
         } else {
             where.add(param);
         }
     }
 
-    private String getCustomFieldName(ConfigField field, char fieldJoinCode){
-        String expression = field.getName();
+    private String getCustomFieldName(QueryField queryField, char fieldJoinCode){
+        String expression = queryField.getName();
         expression = expression.replaceAll("\\{0\\}", "a");
         expression = expression.replaceAll("\\{1\\}", String.valueOf(fieldJoinCode));
         return expression;

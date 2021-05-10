@@ -1,7 +1,7 @@
 package com.irontechspace.dynamicdq.service;
 
-import com.irontechspace.dynamicdq.model.Save.SaveConfig;
-import com.irontechspace.dynamicdq.repository.SaveConfigRepository;
+import com.irontechspace.dynamicdq.model.Query.QueryConfig;
+import com.irontechspace.dynamicdq.repository.QueryConfigRepository;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -12,29 +12,29 @@ import java.util.UUID;
 
 @Log4j2
 @Service
-public class SaveConfigService {
+public class QueryConfigService {
 
-    private final ConfigService<SaveConfig> configService;
+    private final ConfigService<QueryConfig> configService;
 
     @Autowired
-    public SaveConfigService(SaveConfigRepository saveConfigRepository){
-        this.configService = new ConfigService(saveConfigRepository);
+    public QueryConfigService(QueryConfigRepository queryConfigRepository){
+        this.configService = new ConfigService(queryConfigRepository);
     }
 
     @Scheduled(fixedRate = 5000)
     private void loadConfigs(){
-        configService.loadConfigs("Save configs:");
+        configService.loadConfigs("Query configs:");
     }
 
-    public List<SaveConfig> getAll(UUID userId, List<String> userRoles){
+    public List<QueryConfig> getAll(UUID userId, List<String> userRoles){
         return configService.getAll(userId, userRoles);
     }
 
-    public SaveConfig getByName(String configName, UUID userId, List<String> userRoles){
+    public QueryConfig getByName(String configName, UUID userId, List<String> userRoles){
         return configService.getByName(configName, userId, userRoles);
     }
 
-    public SaveConfig save(SaveConfig config){
+    public QueryConfig save(QueryConfig config){
         return configService.save(config);
     }
 

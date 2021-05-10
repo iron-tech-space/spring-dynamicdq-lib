@@ -1,4 +1,4 @@
-package com.irontechspace.dynamicdq.model.SaveData;
+package com.irontechspace.dynamicdq.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -11,7 +11,7 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class SaveConfig {
+public class Config {
     private UUID id;
     private UUID userId;
     private String configName;
@@ -19,5 +19,4 @@ public class SaveConfig {
     private Long position;
     private String sharedForUsers;
     private String sharedForRoles;
-    private String logic;
 }

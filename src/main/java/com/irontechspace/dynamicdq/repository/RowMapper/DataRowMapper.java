@@ -1,10 +1,8 @@
 package com.irontechspace.dynamicdq.repository.RowMapper;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
-import com.irontechspace.dynamicdq.model.ConfigField;
-import com.irontechspace.dynamicdq.model.ConfigTable;
+import com.irontechspace.dynamicdq.model.Query.QueryField;
+import com.irontechspace.dynamicdq.model.Query.QueryConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.log4j.Log4j2;
@@ -12,19 +10,15 @@ import org.springframework.jdbc.core.RowMapper;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
-import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 
 @Log4j2
 public class DataRowMapper implements RowMapper<ObjectNode> {
 
-    private final ConfigTable configTable;
+    private final QueryConfig queryConfig;
 
     private final List<String> whiteListNames; //  = Arrays.asList("id", "parent_id");
 
@@ -32,19 +26,19 @@ public class DataRowMapper implements RowMapper<ObjectNode> {
 
     private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
 
-    public DataRowMapper(ConfigTable configTable){
-        this.configTable = configTable;
-        whiteListNames = configTable.getHierarchyField() != null ? Arrays.asList(configTable.getHierarchyField().split("/")) : new ArrayList<>();
+    public DataRowMapper(QueryConfig queryConfig){
+        this.queryConfig = queryConfig;
+        whiteListNames = queryConfig.getHierarchyField() != null ? Arrays.asList(queryConfig.getHierarchyField().split("/")) : new ArrayList<>();
     }
 
     @Override
     public ObjectNode mapRow(ResultSet rs, int counts) throws SQLException {
         ObjectNode rowObject = new ObjectMapper().createObjectNode();
-        for(ConfigField field : configTable.getFields()){
-            if(whiteListNames.contains(field.getAliasOrName()) || field.getVisible()) {
-                String fieldName = field.getAliasOrName();
+        for(QueryField queryField : queryConfig.getFields()){
+            if(whiteListNames.contains(queryField.getAliasOrName()) || queryField.getVisible()) {
+                String fieldName = queryField.getAliasOrName();
 
-                switch (field.getTypeData()) {
+                switch (queryField.getTypeData()) {
                     case "uuid":
                     case "text":
                         rowObject.put(fieldName, rs.getString(fieldName));

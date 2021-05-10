@@ -97,7 +97,7 @@ public class SaveFileService {
      */
     public ResponseEntity<Object> saveFile(String configName, UUID userId, List<String> userRoles, MultipartFile file, JsonNode dataObject) {
 
-        saveConfigService.getSaveConfigByConfigName(configName, userId, userRoles);
+        saveConfigService.getByName(configName, userId, userRoles);
 
         byte[] content;
         try { content = file.getBytes(); }
