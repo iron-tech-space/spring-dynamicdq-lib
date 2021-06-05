@@ -3,6 +3,7 @@ package com.irontechspace.dynamicdq.repository.RowMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.irontechspace.dynamicdq.model.Query.QueryField;
 import com.irontechspace.dynamicdq.model.Query.QueryConfig;
 import lombok.extern.log4j.Log4j2;
@@ -24,22 +25,24 @@ public class QueryConfigRowMapper implements RowMapper<QueryConfig> {
 
     @Override
     public QueryConfig mapRow(ResultSet rs, int counts) throws SQLException {
-        List<String> fields = inspect(QueryConfig.class);
+        List<String> queryConfigFields = inspect(QueryConfig.class);
         QueryConfig mappedObject = BeanUtils.instantiateClass(QueryConfig.class);
         BeanWrapper bw = PropertyAccessorFactory.forBeanPropertyAccess(mappedObject);
 
-        for (String field : fields){
+        for (String field : queryConfigFields){
             Object value = rs.getObject(field.replaceAll("([^_A-Z])([A-Z])", "$1_$2").toLowerCase());
-
-            if(field.equals("fields") && value != null){
-                try {
-                    List<QueryField> fieldd = objectMapper.readValue(value.toString(), new TypeReference<List<QueryField>>(){});
-                    bw.setPropertyValue(field, fieldd);
-                } catch (JsonProcessingException e){
-                    e.printStackTrace();
+            try {
+                if (field.equals("fields") && value != null) {
+                    bw.setPropertyValue(field, objectMapper.readValue(value.toString(), new TypeReference<List<QueryField>>() {}));
                 }
-            } else
-                bw.setPropertyValue(field, value);
+                else if (field.equals("userSettings") && value != null) {
+                    bw.setPropertyValue(field, objectMapper.readValue(value.toString(), ObjectNode.class));
+
+                } else
+                    bw.setPropertyValue(field, value);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
         return mappedObject;
     }
