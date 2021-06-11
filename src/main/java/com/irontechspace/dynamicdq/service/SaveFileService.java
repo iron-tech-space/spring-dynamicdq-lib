@@ -1,8 +1,8 @@
 package com.irontechspace.dynamicdq.service;
 
+import com.irontechspace.dynamicdq.model.File;
 import com.irontechspace.dynamicdq.utils.FileHashSum;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Longs;
@@ -22,23 +22,20 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.yaml.snakeyaml.util.UriEncoder;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Log4j2
 @Service
 public class SaveFileService {
 
-    /**
-     * Директория на файловой системе в которую сохранять файлы
-     */
+    /** Директория на файловой системе в которую сохранять файлы */
     @Value("${dynamicdq.files.dir}")
     String rootDir;
 
@@ -54,39 +51,92 @@ public class SaveFileService {
     @Autowired
     SaveDataService saveDataService;
 
-    private static final int EXTENSION_SHIFT = 1;
+    /** Получить Response с файлом */
+    public ResponseEntity<Resource> getFileResponse(String configName, UUID userId, List<String> userRoles, JsonNode filter){
+        File file = getFile(configName, userId, userRoles, filter);
+        return ResponseEntity.ok()
+                .headers(getHeadersWithFileName(file.getName()))
+                .contentLength(file.getContent().length)
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(new ByteArrayResource(file.getContent()));
+    }
 
-    /**
-     * Получение файла
-     * @param configName - имя конфигурации для получения данных о файле
-     * @param id - id файла в БД
-     * @return - ResponseEntity с файлом или throw
-     */
-    public ResponseEntity<Resource> getFileById(String configName, UUID userId, List<String> userRoles, String id){
-        ObjectNode filter = new ObjectMapper().createObjectNode();
-        filter.put("id", id);
-        List<ObjectNode> files = dataService.getFlatData(configName, userId, userRoles, filter, PageRequest.of(0, 1));
+    /** Получить Response с файлами */
+    public ResponseEntity<Resource> getFilesResponse(String configName, UUID userId, List<String> userRoles, JsonNode filter){
+        return getZipArchive(getFiles(configName, userId, userRoles, filter));
+    }
 
-        if(files.size() == 0)
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found");
-        else if(files.size() > 1)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "По данно ID найдено слишком много файлов");
-        else {
-            ObjectNode fileData = files.get(0);
-            try {
-                String fileAbsolutePath = Paths.get(rootDir, fileData.get("path").asText()).toAbsolutePath().toString();
-                byte[] content = getContent(fileAbsolutePath);
-                return ResponseEntity.ok()
-                        .headers(getHeadersWithFileName(fileData.get("name").asText()))
-                        .contentLength(content.length)
-                        .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                        .body(new ByteArrayResource(content));
-            } catch (IOException ex) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Error load file", ex);
+    public ResponseEntity<Resource> getZipArchive(List<File> files){
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(byteArrayOutputStream);
+        ZipOutputStream zipOutputStream = new ZipOutputStream(bufferedOutputStream);
+        Map<String, Integer> zipNames = new HashMap<>();
+        try {
+            for(File file : files){
+                ZipEntry zipEntry;
+
+                if (zipNames.containsKey(file.getName())) {
+                    Integer newIndex = zipNames.get(file.getName()) + 1;
+                    zipEntry = new ZipEntry(createEntryName(file.getName(), newIndex));
+                    zipNames.put(zipEntry.getName(), newIndex);
+                } else {
+                    zipEntry = new ZipEntry(file.getName());
+                    zipNames.put(zipEntry.getName(), 0);
+                }
+
+                zipOutputStream.putNextEntry(zipEntry);
+                zipOutputStream.write(file.getContent(), 0, file.getContent().length);
+                zipOutputStream.closeEntry();
             }
+            bufferedOutputStream.close();
+            byteArrayOutputStream.close();
+
+            zipOutputStream.finish();
+            zipOutputStream.flush();
+
+            byte[] zipContent = byteArrayOutputStream.toByteArray();
+
+            return ResponseEntity.ok()
+                    .headers(getHeadersWithFileName("files.zip"))
+                    .contentLength(zipContent.length)
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(new ByteArrayResource(zipContent));
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Ошибка записи в архив", ex);
         }
     }
 
+    /** Получить файл по параметрам */
+    public File getFile(String configName, UUID userId, List<String> userRoles, JsonNode filter) {
+        ObjectNode fileData = dataService.getObject(configName, userId, userRoles, filter, PageRequest.of(0, 1));
+        try {
+            return getFile(fileData);
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Ошибка чтения файла", ex);
+        }
+    }
+    /** Получить файлы по параметрам */
+    public List<File> getFiles(String configName, UUID userId, List<String> userRoles, JsonNode filter) {
+        List<ObjectNode> filesData = dataService.getFlatData(configName, userId, userRoles, filter, PageRequest.of(0, 1));
+        List<File> files = new ArrayList<>();
+        try {
+            for(ObjectNode fileData : filesData) {
+                files.add(getFile(fileData));
+            }
+            return files;
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Ошибка чтения файла", ex);
+        }
+    }
+
+    private File getFile (ObjectNode fileData) throws IOException {
+        String fileAbsolutePath = Paths.get(rootDir, fileData.get("path").asText()).toAbsolutePath().toString();
+        File file = new File();
+        file.setAbsolutePath(fileAbsolutePath);
+        file.setName(fileData.get("name").asText());
+        file.setContent(getContent(fileAbsolutePath));
+        return file;
+    }
 
     /**
      * Сохранить файл в БД и на файловую систему
@@ -138,8 +188,6 @@ public class SaveFileService {
         fileData.put("deleted", false);
         fileData.put("isGroup", false);
 
-        log.info("fileData               = [{}]", fileData.toString());
-
         if(!Files.exists(directoryPath))
             try { Files.createDirectories(directoryPath); }
             catch (IOException ex) {
@@ -155,12 +203,12 @@ public class SaveFileService {
 
     /**
      * Получить содержимое файла по абсольтному пути
-     * @param filePath - абсолютный путь к файлу
+     * @param absolutePath - абсолютный путь к файлу
      * @return - содержимое файла
      * @throws IOException - исключение при неудачном чтении файла
      */
-    private byte[] getContent(String filePath) throws IOException {
-        try(val contentStream = new FileInputStream(new File(filePath))) {
+    private byte[] getContent(String absolutePath) throws IOException {
+        try(val contentStream = new FileInputStream(absolutePath)) {
             val content = new byte[contentStream.available()];
             contentStream.read(content);
             return content;
@@ -183,6 +231,21 @@ public class SaveFileService {
         }};
     }
 
+    private String createEntryName(String fileName, Integer index) {
+        return String.format("%s(%s).%s", getFileNameWithoutExtension(fileName), index, getFileExtension(fileName));
+    }
+
+    /**
+     * Получить имя файла без расширения по его имени
+     * @param fileName - имя файла
+     * @return - стркоа с именем файла
+     */
+    private String getFileNameWithoutExtension(String fileName) {
+        return Optional.ofNullable(fileName)
+                .filter(f -> f.contains("."))
+                .map(f -> f.substring(0, fileName.lastIndexOf(".") - 1)).orElse("");
+    }
+
     /**
      * Получить расширение файла по его имени
      * @param fileName - имя файла
@@ -191,7 +254,7 @@ public class SaveFileService {
     private String getFileExtension(String fileName) {
         return Optional.ofNullable(fileName)
                 .filter(f -> f.contains("."))
-                .map(f -> f.substring(fileName.lastIndexOf(".") + EXTENSION_SHIFT)).orElse("");
+                .map(f -> f.substring(fileName.lastIndexOf(".") + 1)).orElse("");
     }
 
     /**
@@ -201,7 +264,7 @@ public class SaveFileService {
      * @throws IOException - исключение при неудачной записи файла
      */
     private void saveFileIntoStorageDirectory(String absolutePath, byte[] content) throws IOException {
-        try (FileOutputStream fileStream = new FileOutputStream(new File(absolutePath))) {
+        try (FileOutputStream fileStream = new FileOutputStream(absolutePath)) {
             fileStream.write(content);
         } catch (IOException e) {
             log.error(String.format("File %s not saved", absolutePath), e);

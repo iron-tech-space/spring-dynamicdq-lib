@@ -1,6 +1,10 @@
 package com.irontechspace.dynamicdq.model.Query;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.irontechspace.dynamicdq.model.Config;
+import com.irontechspace.dynamicdq.model.Save.SaveConfig;
+import com.irontechspace.dynamicdq.model.Save.SaveLogic;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,4 +25,5 @@ public class QueryConfig extends Config {
     private Boolean hierarchyLazyLoad;
     private String customSql;
     private List<QueryField> fields;
+    private ObjectNode userSettings;
 }

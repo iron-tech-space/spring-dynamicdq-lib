@@ -28,9 +28,8 @@ public class MonitoringService {
 
     private ObjectMapper mapper = new ObjectMapper();
 
-    @Value("${dynamicdq.monitoring.active}")
+    @Value("${dynamicdq.monitoring.active:false}")
     Boolean monitoringActive;
-
 
     @Scheduled(fixedRate = 5000)
     public void SendMonitoringInfo() throws JsonProcessingException {

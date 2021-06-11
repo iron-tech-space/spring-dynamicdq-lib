@@ -1,8 +1,10 @@
 package com.irontechspace.dynamicdq.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.irontechspace.dynamicdq.model.Query.QueryField;
 import com.irontechspace.dynamicdq.model.Query.QueryConfig;
 import com.irontechspace.dynamicdq.model.JoinTable;
+import com.irontechspace.dynamicdq.model.TypeQuery;
 import com.irontechspace.dynamicdq.repository.QueryRepository;
 import com.irontechspace.dynamicdq.repository.RowMapper.DataRowMapper;
 import com.irontechspace.dynamicdq.utils.SqlUtils;
@@ -15,8 +17,10 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import javax.sql.DataSource;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -27,57 +31,78 @@ import static java.util.stream.Collectors.joining;
 @Service
 public class DataService {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String SQL_SELECT = "\tselect %s ";
+    private static final String SQL_FROM = "\n\tfrom %s a \n";
+    private static final String SQL_JOIN = "\t\tleft join %s %s on %s.%s = %s.%s \n";
+    private static final String SQL_WHERE_1_1 = "\twhere 1=1 \n";
+    private static final String SQL_GROUP_BY = "\tgroup by %s \n";
+    private static final String SQL_ORDER_BY = "\torder by %s \n";
+    private static final String SQL_PAGEABLE = "\tlimit :pageSize\n\toffset :offset \n";
+    private static final String SQL_ROW_NUMBER = " row_number() over() + :offset as row_number, ";
+
     @Autowired
     QueryConfigService queryConfigService;
-
     @Autowired
     QueryRepository queryRepository;
-
     @Autowired
     TypeConverter typeConverter;
 
-    private static final String SQL_SELECT = "\tselect %s ";
 
-    private static final String SQL_FROM = "\n\tfrom %s a \n";
+    /** Получение SQL */
+    public ObjectNode getSql(String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
+        return getSql(null, configName, userId, userRoles, filter, pageable);
+    }
+    /** Получение SQL */
+    public ObjectNode getSql(DataSource dateSource, String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
+        return getQueryData(dateSource, getConfigByName(dateSource, configName, userId, userRoles), userId, userRoles, filter, pageable, TypeQuery.SQL);
+    }
 
-    private static final String SQL_JOIN = "\t\tleft join %s %s on %s.%s = %s.%s \n";
+    /** Получить количественный SQL */
+    public ObjectNode getSqlCount(String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
+        return getSqlCount(null, configName, userId, userRoles, filter, pageable);
+    }
+    /** Получить количественный SQL */
+    public ObjectNode getSqlCount(DataSource dateSource, String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
+        return getQueryData(dateSource, getConfigByName(dateSource, configName, userId, userRoles), userId, userRoles, filter, pageable, TypeQuery.SQL_COUNT);
+    }
 
-    private static final String SQL_WHERE_1_1 = "\twhere 1=1 \n";
-
-    private static final String SQL_GROUP_BY = "\tgroup by %s \n";
-
-    private static final String SQL_ORDER_BY = "\torder by %s \n";
-
-    private static final String SQL_PAGEABLE = "" +
-            "\tlimit :pageSize \n" +
-            "\toffset :offset \n";
-
-    private static final String SQL_ROW_NUMBER = "" +
-            "row_number() over() + :offset as row_number, ";
-
+    /** Получение объект данных */
+    public ObjectNode getObject(String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
+        return getObject(null, configName, userId, userRoles, filter, pageable);
+    }
+    /** Получение объект данных */
+    public ObjectNode getObject(DataSource dateSource, String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
+        return getQueryData(dateSource, getConfigByName(dateSource, configName, userId, userRoles), userId, userRoles, filter, pageable, TypeQuery.OBJECT);
+    }
 
     /** Получение плоской таблицы данных */
     public List<ObjectNode> getFlatData(String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
-
-        QueryConfig queryConfig = queryConfigService.getByName(configName, userId, userRoles);
-
-        return getFlatData(queryConfig, userId, userRoles, filter, pageable);
+        return getFlatData(null, configName, userId, userRoles, filter, pageable);
+    }
+    /** Получение плоской таблицы данных */
+    public List<ObjectNode> getFlatData(DataSource dateSource, String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
+        return getQueryData(dateSource, getConfigByName(dateSource, configName, userId, userRoles), userId, userRoles, filter, pageable);
     }
 
     /** Получение кол-ва данных в плоской таблице */
     public Long getFlatDataCount(String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
-
-        QueryConfig queryConfig = queryConfigService.getByName(configName, userId, userRoles);
-
-        return getFlatData(queryConfig, userId, userRoles, filter, pageable, true);
+        return getFlatDataCount(null, configName, userId, userRoles, filter, pageable);
+    }
+    /** Получение кол-ва данных в плоской таблице */
+    public Long getFlatDataCount(DataSource dateSource, String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
+        QueryConfig queryConfig = getConfigByName(dateSource, configName, userId, userRoles);
+        return getQueryData(dateSource, queryConfig, userId, userRoles, filter, pageable, TypeQuery.COUNT);
     }
 
     /** Получение иерархической таблицы данных */
     public List<ObjectNode> getHierarchicalData(String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
-
-        QueryConfig queryConfig = queryConfigService.getByName(configName, userId, userRoles);
-
-        List<ObjectNode> result = getHierarchicalData(getFlatData(queryConfig, userId, userRoles, filter, pageable), queryConfig.getHierarchyField());
+        return getHierarchicalData(null, configName, userId, userRoles, filter, pageable);
+    }
+    /** Получение иерархической таблицы данных */
+    public List<ObjectNode> getHierarchicalData(DataSource dateSource, String configName, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
+        QueryConfig queryConfig = getConfigByName(dateSource, configName, userId, userRoles);
+        List<ObjectNode> result = getHierarchicalData(getQueryData(dateSource, queryConfig, userId, userRoles, filter, pageable), queryConfig.getHierarchyField());
 
         // Формирование мапы параметров поиска
         Map<String, Pattern> searchFields = new HashMap<>();
@@ -89,7 +114,8 @@ public class DataService {
                     for (int i = 0; i < filterFields.length; i++) {
                         if (filter.has(filterFields[i])
                                 && (filterSigns[i].toLowerCase().equals("ilike") || filterSigns[i].toLowerCase().equals("like"))) {
-                            log.debug("Add searchFields [{}] => {}", queryField.getAliasOrName(), filter.get(filterFields[i]).asText().replaceAll("\\s", ".+?"));
+                            if(queryConfig.getLoggingQueries())
+                                log.info("[{}] Add search field [{}]: [{}]", configName, queryField.getAliasOrName(), filter.get(filterFields[i]).asText().replaceAll("\\s", ".+?"));
                             searchFields.put(
                                     queryField.getAliasOrName(),
                                     Pattern.compile(filter.get(filterFields[i]).asText().replaceAll("\\s", ".+?")));
@@ -100,34 +126,25 @@ public class DataService {
         }
         // Если мапа параметров поиска не пустая, то ищем
         if(searchFields.size() > 0) {
-            log.debug("Search by tree");
+            if(queryConfig.getLoggingQueries())
+                log.info("[{}] Search by tree", configName);
             for (int i = result.size() - 1; i >= 0; i--) {
                 if (removeRecursively(result.get(i), searchFields)) {
                     result.remove(i);
                 }
             }
-        } else
-            log.debug("Skip search by tree");
+        } else if(queryConfig.getLoggingQueries())
+            log.info("[{}] Skip search by tree", configName);
         return result;
     }
 
-
-    /** Получение RowNumber SQL */
-    private String getRowNumber(List<QueryField> queryFields){
-        Optional<QueryField> rowNumber = queryFields.stream().filter(o -> o.getName().equals("row_number")).findFirst();
-        if(rowNumber.isPresent()) {
-            return rowNumber.get().getVisible() ? SQL_ROW_NUMBER : "";
-        } else {
-            return "";
-        }
+    /** Перегрузка метода получения данных */
+    private List<ObjectNode> getQueryData(DataSource dateSource, QueryConfig queryConfig, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
+        return getQueryData(dateSource, queryConfig, userId, userRoles, filter, pageable, TypeQuery.TABLE);
     }
 
-    private List<ObjectNode> getFlatData(QueryConfig queryConfig, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
-        return getFlatData(queryConfig, userId, userRoles, filter, pageable, false);
-    }
-
-    private <T> T getFlatData(QueryConfig queryConfig, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable, Boolean countQuery) {
-
+    /** ОСНОВНОЙ метода получения данных */
+    private <T> T getQueryData(DataSource dateSource, QueryConfig queryConfig, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable, TypeQuery typeQuery) {
         List<QueryField> queryFields = queryConfig.getFields();
         List<String> sourceFields = new ArrayList<>();
         List<JoinTable> joinTables = new ArrayList<>();
@@ -135,8 +152,6 @@ public class DataService {
         List<String> groupBy = new ArrayList<>();
         List<String> having = new ArrayList<>();
         SortedMap<Integer, String> orderByInside = new TreeMap<>();
-
-        log.info("countQuery => [{}]", countQuery);
 
         // Инициализация параметров запроса
         MapSqlParameterSource params = new MapSqlParameterSource();
@@ -282,7 +297,6 @@ public class DataService {
                         filterOutside.add(String.format(" %s \n", whereInside));
                     else
                         filterOutside.add(String.format(" and %s \n", whereInside));
-//                    log.debug(whereInside);
                 }
 
 
@@ -298,7 +312,8 @@ public class DataService {
 
                             if(queryConfig.getHierarchical() != null && queryConfig.getHierarchical()
                                 && (filterSigns[i].toLowerCase().equals("ilike") || filterSigns[i].toLowerCase().equals("like"))){
-                                log.info("Skip like filter");
+                                if(queryConfig.getLoggingQueries())
+                                    log.info("[{}] Skip like filter", queryConfig.getConfigName());
                                 continue;
                             }
 
@@ -405,18 +420,19 @@ public class DataService {
                 sql = sql.replaceAll(":SORT_FIELDS", "");
 
             // Добавили пагинацию в SQL (если pageSize == 1, то ограничение на кол-во не накладывается)
-            if (pageable.getPageSize() != 1)
+            if (typeQuery != TypeQuery.COUNT && typeQuery != TypeQuery.SQL_COUNT && pageable.getPageSize() != 1)
                 sql = sql.replaceAll( ":PAGEABLE", SQL_PAGEABLE);
             else
                 sql = sql.replaceAll( ":PAGEABLE", "");
 
-            log.debug("Before repository -> \n{}", sql);
+            if(queryConfig.getLoggingQueries())
+                log.info("[{}]\n DATA: [{}]\n SQL: [{}]\n", queryConfig.getConfigName(), params.toString(), sql);
+
             FINAL_SQL = sql;
-//            return dataRepository.getTable(sql, params, new DataRowMapper(configTable));
 
         } else {
 
-            /** Формирование SQL */
+            // Формирование SQL
             StringBuilder sql = new StringBuilder();
             sql.append("with t as ( \n");
 
@@ -449,25 +465,65 @@ public class DataService {
             // sql.append(String.format(SQL_ORDER_BY, orderByInside.entrySet().stream().map(e -> e.getValue()).collect(Collectors.joining(", "))));
 
             // Добавили пагинацию в SQL (если pageSize == 1, то ограничение на кол-во не накладывается)
-            if (!countQuery && pageable.getPageSize() != 1) sql.append(SQL_PAGEABLE);
+            if (typeQuery != TypeQuery.COUNT && typeQuery != TypeQuery.SQL_COUNT && pageable.getPageSize() != 1)
+                sql.append(SQL_PAGEABLE);
 
             // Добавить основной селект
-            if(countQuery)
+            if(typeQuery == TypeQuery.COUNT || typeQuery == TypeQuery.SQL_COUNT)
                 sql.append(") \nselect count(t.*) from t \n");
             else
                 sql.append(String.format(") \nselect %s t.* from t \n", getRowNumber(queryFields)));
 
-            // log.debug(ob);
-            log.debug("Before repository pageSize: [{}], offset: [{}] -> \n{}", pageable.getPageSize(), pageable.getOffset(), sql.toString());
+            if(queryConfig.getLoggingQueries())
+                log.info("[{}]\n DATA: [{}]\n PAGE SIZE: [{}], OFFSET: [{}]\n SQL: [{}]\n", queryConfig.getConfigName(), params.toString(), pageable.getPageSize(), pageable.getOffset(), sql.toString());
+
             FINAL_SQL = sql.toString();
         }
 
-        if(countQuery)
-            return (T) queryRepository.getCount(FINAL_SQL, params, Long.class);
-        else
-            return (T) queryRepository.getTable(FINAL_SQL, params, new DataRowMapper(queryConfig));
+        switch (typeQuery){
+            case SQL:
+            case SQL_COUNT:
+                ObjectNode objectNode = OBJECT_MAPPER.createObjectNode();
+                objectNode.put("sql", FINAL_SQL);
+                try {
+                    objectNode.put("params", OBJECT_MAPPER.writeValueAsString(params.getValues()));
+                } catch (JsonProcessingException ignored) {}
+                return (T) objectNode;
+            case COUNT:
+                return  dateSource == null
+                        ? (T) queryRepository.selectCount(FINAL_SQL, params, Long.class)
+                        : (T) queryRepository.selectCount(new NamedParameterJdbcTemplate(dateSource), FINAL_SQL, params, Long.class);
+            case OBJECT:
+                return dateSource == null
+                        ? (T) queryRepository.selectObject(FINAL_SQL, params.getValues(), ObjectNode.class)
+                        : (T) queryRepository.selectObject(new NamedParameterJdbcTemplate(dateSource), FINAL_SQL, params.getValues(), ObjectNode.class);
+            case TABLE:
+            default:
+                return dateSource == null
+                    ? (T) queryRepository.selectTable(FINAL_SQL, params, new DataRowMapper(queryConfig))
+                    : (T) queryRepository.selectTable(new NamedParameterJdbcTemplate(dateSource), FINAL_SQL, params, new DataRowMapper(queryConfig));
+        }
     }
 
+    /** Поулчить конфигурацию по параметрам */
+    private QueryConfig getConfigByName (DataSource dateSource, String configName, UUID userId, List<String> userRoles) {
+        return dateSource == null
+                ? queryConfigService.getByName(configName, userId, userRoles)
+                : queryConfigService.getByName(dateSource, configName, userId, userRoles);
+    }
+
+    /** Получение RowNumber SQL */
+    private String getRowNumber(List<QueryField> queryFields){
+        Optional<QueryField> rowNumber = queryFields.stream().filter(o -> o.getName().equals("row_number")).findFirst();
+        return rowNumber.filter(QueryField::getVisible).map(queryField -> SQL_ROW_NUMBER).orElse("");
+//        if(rowNumber.isPresent()) {
+//            return rowNumber.get().getVisible() ? SQL_ROW_NUMBER : "";
+//        } else {
+//            return "";
+//        }
+    }
+
+    /** Задать Where или Having в зависимости от типа поля */
     private void setWhereOrHaving(QueryField queryField, List<String> where, List<String> having, String param) {
         if(queryField.getTypeField().equals("customAggregate")){
             having.add(param);
@@ -476,6 +532,7 @@ public class DataService {
         }
     }
 
+    /** Получить name для кастомного поля */
     private String getCustomFieldName(QueryField queryField, char fieldJoinCode){
         String expression = queryField.getName();
         expression = expression.replaceAll("\\{0\\}", "a");
@@ -497,8 +554,6 @@ public class DataService {
             }
         }
 
-        ObjectMapper mapper = new ObjectMapper();
-
         List<ObjectNode> treeData = new ArrayList<>();
         Map<String, ArrayNode> childrenOf = new HashMap<>();
         ObjectNode item;
@@ -515,7 +570,7 @@ public class DataService {
             if (childrenOf.get(id.asText()) != null) {
                 childrenOf.put(id.asText(), childrenOf.get(id.asText()));
             } else {
-                childrenOf.put(id.asText(), mapper.createArrayNode());
+                childrenOf.put(id.asText(), OBJECT_MAPPER.createArrayNode());
             }
 
             // Инициализируем детей у элемента
@@ -530,7 +585,7 @@ public class DataService {
                 if (childrenOf.get(parentId.asText()) != null) {
                     childrenOf.put(parentId.asText(), childrenOf.get(parentId.asText()));
                 } else {
-                    childrenOf.put(parentId.asText(), mapper.createArrayNode());
+                    childrenOf.put(parentId.asText(), OBJECT_MAPPER.createArrayNode());
                 }
 
                 // Добавить в родителя текущий элемент
@@ -541,41 +596,35 @@ public class DataService {
                 treeData.add(item);
             }
         }
-        ;
-
         return treeData;
     }
 
     private Boolean removeRecursively(ObjectNode treeItem, Map<String, Pattern> searchFields) {
+        // Если treeItem имеет детей
         if (treeItem.has("children") && treeItem.get("children").isArray() && treeItem.get("children").size() > 0) {
-            Boolean needRemoveNode = true;
-
+            boolean needRemoveNode = true;
             ArrayNode children = (ArrayNode) treeItem.get("children");
-            for(int i = children.size()-1; i >= 0 ; i--){
-                if(removeRecursively((ObjectNode) children.get(i), searchFields)){
+            // Перебор всех детей с конца и рекурсивное удаление
+            for(int i = children.size()-1; i >= 0 ; i--)
+                if(removeRecursively((ObjectNode) children.get(i), searchFields))
                     children.remove(i);
-                } else {
+                else
                     needRemoveNode = false;
-                }
-            }
-//            log.info("[{}] => {}", treeItem.get("name").asText(), needRemoveNode);
+            // log.info("[{}] => {}", treeItem.get("name").asText(), needRemoveNode);
             return needRemoveNode;
         } else {
-            Boolean needRemoveSheet = true;
-
+            boolean needRemoveSheet = true;
             for (String field : searchFields.keySet()) {
-//                log.info("Sheet key: {}", field);
-
+                // log.info("Sheet key: {}", field);
                 String name = treeItem.get(field).asText();
                 if(searchFields.get(field).matcher(name).find()){
-//                    log.info("Sheet key: {}, value: [{}], result [true]", field, name);
+                    // log.info("Sheet key: {}, value: [{}], result [true]", field, name);
                     needRemoveSheet = false;
-                } else {
-//                    log.info("Sheet key: {}, value: [{}], result [false]", field, name);
                 }
+                // else
+                //     log.info("Sheet key: {}, value: [{}], result [false]", field, name);
             }
             return needRemoveSheet;
         }
     }
-
 }

@@ -3,6 +3,7 @@ package com.irontechspace.dynamicdq.exceptions.handlers;
 
 import com.irontechspace.dynamicdq.exceptions.ForbiddenException;
 import com.irontechspace.dynamicdq.exceptions.NotFoundException;
+import lombok.extern.log4j.Log4j2;
 import org.postgresql.util.PSQLException;
 import org.springframework.beans.ConversionNotSupportedException;
 import org.springframework.beans.TypeMismatchException;
@@ -27,6 +28,7 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
+@Log4j2
 @ControllerAdvice
 public class DefaultAdvice
 {
@@ -119,6 +121,7 @@ public class DefaultAdvice
     private ResponseEntity<Object> getEntity (HttpStatus status, String message, StackTraceElement[] error) {
         return ResponseEntity.status(status)
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ExceptionResponseObject.builder().status(status.value()).error(message).error_description(error).build());
+                .body(ExceptionResponseObject.builder().status(status.value()).error(message).build());
+//                .body(ExceptionResponseObject.builder().status(status.value()).error(message).error_description(error).build());
     }
 }
