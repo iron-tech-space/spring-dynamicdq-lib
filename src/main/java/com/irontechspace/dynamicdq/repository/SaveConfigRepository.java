@@ -90,7 +90,7 @@ public class SaveConfigRepository extends ConfigRepository implements IConfigRep
             log.info("\n DATA: [{}]\n SQL: [{}]\n", params.toString(), sql);
             jdbcTemplate.update(sql, params);
         }
-        logHistory(saveConfig, operation, "SAVE");
+        logHistory(jdbcTemplate, saveConfig, operation, "SAVE");
         return saveConfig;
     }
 
