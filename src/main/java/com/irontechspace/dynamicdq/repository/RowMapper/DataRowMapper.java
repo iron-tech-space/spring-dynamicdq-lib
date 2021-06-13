@@ -18,13 +18,11 @@ import java.util.List;
 @Log4j2
 public class DataRowMapper implements RowMapper<ObjectNode> {
 
+    private final static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private final static SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
+
     private final QueryConfig queryConfig;
-
     private final List<String> whiteListNames; //  = Arrays.asList("id", "parent_id");
-
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
-    private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
 
     public DataRowMapper(QueryConfig queryConfig){
         this.queryConfig = queryConfig;
@@ -47,12 +45,12 @@ public class DataRowMapper implements RowMapper<ObjectNode> {
                         try {
                             String value = rs.getString(fieldName);
                             if(value != null)
-                                rowObject.put(fieldName, objectMapper.readTree(value));
+                                rowObject.put(fieldName, OBJECT_MAPPER.readTree(value));
                             else
-                                rowObject.put(fieldName, objectMapper.nullNode());
+                                rowObject.put(fieldName, OBJECT_MAPPER.nullNode());
                         } catch (JsonProcessingException e) {
                             e.printStackTrace();
-                            rowObject.put(fieldName, objectMapper.nullNode());
+                            rowObject.put(fieldName, OBJECT_MAPPER.nullNode());
                         }
                         break;
                     case "int":
@@ -62,7 +60,7 @@ public class DataRowMapper implements RowMapper<ObjectNode> {
                         if(rs.getTimestamp(fieldName) != null)
                             rowObject.put(fieldName, dateFormatter.format(rs.getTimestamp(fieldName)));
                         else
-                            rowObject.put(fieldName, objectMapper.nullNode());
+                            rowObject.put(fieldName, OBJECT_MAPPER.nullNode());
                         break;
                     case "time":
                         rowObject.put(fieldName,
