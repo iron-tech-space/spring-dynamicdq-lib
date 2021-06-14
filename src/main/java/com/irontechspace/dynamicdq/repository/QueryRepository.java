@@ -59,13 +59,18 @@ public class QueryRepository {
         return getObjectFormList(result, sql, params);
     }
 
-    public <T> T selectObject(String sql, Map<String, Object> params, Class<T> clazz){
-        return selectObject(jdbcTemplate, sql, params, clazz);
+    public <T> Boolean checkExistObject(String sql, Map<String, Object> params, Class<T> clazz){
+        return checkExistObject(jdbcTemplate, sql, params, clazz);
     }
 
-    public <T> T selectObject(NamedParameterJdbcTemplate jdbcTemplate, String sql, Map<String, Object> params, Class<T> clazz){
+    public <T> Boolean checkExistObject(NamedParameterJdbcTemplate jdbcTemplate, String sql, Map<String, Object> params, Class<T> clazz){
         List <T> result = jdbcTemplate.query(sql, params, BeanPropertyRowMapper.newInstance(clazz));
-       return getObjectFormList(result, sql, params);
+        if(result.size() == 0)
+            return false;
+        else if(result.size() > 1)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format("Найдено слишком много (%s) объектов по запросу\n DATA: [%s]\n SQL: [%s]\n", result.size(), params, sql));
+        else
+            return true;
     }
 
     public <T> T insert(String sql, Map<String, Object> params, Class<T> clazz){
