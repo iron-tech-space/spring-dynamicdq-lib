@@ -81,7 +81,7 @@ public class SaveConfigRepository extends ConfigRepository implements IConfigRep
             operation = "INSERT";
             sql = SqlUtils.generateSql(TypeSql.INSERT, tableNameSaveConfigs, SaveConfig.class, EXCLUDE_FIELDS_NAMES);
             log.info("\n DATA: [{}]\n SQL: [{}]\n", params.toString(), sql);
-            jdbcTemplate.queryForObject(sql, params, UUID.class);
+            saveConfig.setId(jdbcTemplate.queryForObject(sql, params, UUID.class));
         }
         // Update
         else{

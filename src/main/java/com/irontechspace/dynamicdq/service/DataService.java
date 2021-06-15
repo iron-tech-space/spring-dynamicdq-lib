@@ -495,8 +495,8 @@ public class DataService {
                         : (T) queryRepository.selectCount(new NamedParameterJdbcTemplate(dateSource), FINAL_SQL, params, Long.class);
             case OBJECT:
                 return dateSource == null
-                        ? (T) queryRepository.selectObject(FINAL_SQL, params.getValues(), ObjectNode.class)
-                        : (T) queryRepository.selectObject(new NamedParameterJdbcTemplate(dateSource), FINAL_SQL, params.getValues(), ObjectNode.class);
+                        ? (T) queryRepository.selectObject(FINAL_SQL, params.getValues())
+                        : (T) queryRepository.selectObject(new NamedParameterJdbcTemplate(dateSource), FINAL_SQL, params.getValues());
             case TABLE:
             default:
                 return dateSource == null

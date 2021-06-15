@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.irontechspace.dynamicdq.model.Config;
+import com.irontechspace.dynamicdq.repository.RowMapper.ObjectNodeRowMapper;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
@@ -22,6 +23,8 @@ import java.util.UUID;
 public class ConfigRepository {
 
     private final static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private final static RowMapper<ObjectNode> OBJECT_NODE_ROW_MAPPER = new ObjectNodeRowMapper();
+
     private final static String INSERT_HISTORY =
             "INSERT INTO dynamicdq.configs_history (id, ts, operation, config_type, column_data) " +
                     "VALUES (:id, current_timestamp, :operation, :configType, :columnData) returning id;";
@@ -88,20 +91,6 @@ public class ConfigRepository {
     }
 
     public List<ObjectNode> getDbFieldsByTable(NamedParameterJdbcTemplate jdbcTemplate, String tableName) {
-        return jdbcTemplate.query(SQL_GET_DB_FIELDS_BY_TABLE, new MapSqlParameterSource("tableName", tableName), new RowMapper<ObjectNode>() {
-            @Override
-            public ObjectNode mapRow(ResultSet rs, int rowNum) throws SQLException {
-                ObjectNode rowObject = OBJECT_MAPPER.createObjectNode();
-                ResultSetMetaData rsm = rs.getMetaData();
-                for (int i = 1; i <= rsm.getColumnCount(); i++ ) {
-                    char[] oldName = rsm.getColumnName(i).toCharArray();
-                    String newName = "";
-                    for(int n = 0; n < oldName.length; n++)
-                        newName += oldName[n] == '_' ? Character.toUpperCase(oldName[++n]) : oldName[n];
-                    rowObject.put(newName, rs.getString(i));
-                }
-                return rowObject;
-            }
-        });
+        return jdbcTemplate.query(SQL_GET_DB_FIELDS_BY_TABLE, new MapSqlParameterSource("tableName", tableName), OBJECT_NODE_ROW_MAPPER);
     }
 }
