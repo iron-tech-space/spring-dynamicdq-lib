@@ -98,7 +98,7 @@ public class QueryConfigRepository extends ConfigRepository implements IConfigRe
             jdbcTemplate.update(table_sql, tableParams);
         }
 
-        logHistory(queryConfig, operation, "QUERY");
+        logHistory(jdbcTemplate, queryConfig, operation, "QUERY");
         return queryConfig;
     }
 

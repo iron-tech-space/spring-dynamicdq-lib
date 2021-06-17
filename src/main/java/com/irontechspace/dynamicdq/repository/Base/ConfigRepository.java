@@ -54,7 +54,7 @@ public class ConfigRepository {
     @Autowired
     public NamedParameterJdbcTemplate jdbcTemplate;
 
-    public <T extends Config> void logHistory(T queryConfig, String operation, String configType) {
+    public <T extends Config> void logHistory(NamedParameterJdbcTemplate jdbcTemplate, T queryConfig, String operation, String configType) {
 
         //:id, current_timestamp, :operation, :configType, :columnData
         try {
