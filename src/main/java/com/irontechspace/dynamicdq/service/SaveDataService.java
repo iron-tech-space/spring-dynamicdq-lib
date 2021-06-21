@@ -97,7 +97,7 @@ public class SaveDataService {
         String selectById = generateSql(TypeSql.SELECT_BY_ID, saveLogic.getTableName(), saveLogic.getFields().stream().map(SaveField::getName).collect(Collectors.toList()), saveLogic.getPrimaryKey(), saveLogic.getExcludePrimaryKey());
 
         // Точка сохранения результата select by id
-        Object selectedObject = null;
+        Boolean existObject = false;
         // Точка сохранения результата insert or update
         Object result = null;
         // Параметры запроса
@@ -106,14 +106,14 @@ public class SaveDataService {
 
         if(dataObject.has(saveLogic.getPrimaryKey()) && !dataObject.get(saveLogic.getPrimaryKey()).isNull()) {
             params = getParams(saveLogic.getFields(), dataObject, parentResult, userId, userRoles);
-            selectedObject = dateSource == null
-                    ? queryRepository.selectObject(selectById, params, Object.class)
-                    : queryRepository.selectObject(new NamedParameterJdbcTemplate(dateSource), selectById, params, Object.class);
+            existObject = dateSource == null
+                    ? queryRepository.checkExistObject(selectById, params, Object.class)
+                    : queryRepository.checkExistObject(new NamedParameterJdbcTemplate(dateSource), selectById, params, Object.class);
             if(loggingQueries) log.info("\n DATA: [{}]\n SQL: [{}]\n", params.toString(), selectById);
         }
 
 
-        if(selectedObject == null) {
+        if(!existObject) {
             String insertSql = generateSql(TypeSql.INSERT, saveLogic.getTableName(), saveLogic.getFields().stream().map(SaveField::getName).collect(Collectors.toList()), saveLogic.getPrimaryKey(), saveLogic.getExcludePrimaryKey());
             if(saveLogic.getAutoGenerateCode())
                 insertSql = insertSql.replace(":code", generateCodeSql(saveLogic.getTableName()));
