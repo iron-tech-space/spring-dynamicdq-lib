@@ -10,7 +10,6 @@ import com.irontechspace.dynamicdq.rabbit.model.RabbitTask;
 import com.irontechspace.dynamicdq.rabbit.model.RabbitTaskConfig;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -23,14 +22,10 @@ import java.util.Map;
 @Service
 public class RabbitService {
 
-    @Value("${spring.rabbitmq.tasks.deep}")
-    Integer tasksDeep;
-
     @Autowired
     ExecutorService executorService;
 
-    public void executeTask(RabbitTask task, Integer deep){
-//        if(deep > tasksDeep) return;
+    public void executeTask(RabbitTask task){
         try {
             String nextConfig = null;
             Map<String, Object> outputData = new HashMap<>();
@@ -54,7 +49,6 @@ public class RabbitService {
                 ObjectNode body = (ObjectNode) config.getBody();
                 replace(body, outputData);
                 log.info("Execute task type: [{}] body {}", config.getExecutorType(), body);
-//
 
                 if(config.getExecutorType() == ExecutorType.branch) {
                     JsonNode output = new ObjectMapper().readTree(config.getOutput());
