@@ -1,6 +1,6 @@
 package com.irontechspace.dynamicdq.utils;
 
-import com.irontechspace.dynamicdq.model.TypeSql;
+import com.irontechspace.dynamicdq.configurator.core.model.TypeSql;
 import org.springframework.jdbc.core.namedparam.BeanPropertySqlParameterSource;
 
 import java.lang.reflect.Field;

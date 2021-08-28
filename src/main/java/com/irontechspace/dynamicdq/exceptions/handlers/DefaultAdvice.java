@@ -1,6 +1,4 @@
 package com.irontechspace.dynamicdq.exceptions.handlers;
-
-
 import com.irontechspace.dynamicdq.exceptions.ForbiddenException;
 import com.irontechspace.dynamicdq.exceptions.NotFoundException;
 import lombok.extern.log4j.Log4j2;
