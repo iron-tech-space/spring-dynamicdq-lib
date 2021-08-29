@@ -53,7 +53,9 @@ public class SaveService {
                     ? saveConfigService.getByName(configName, userId, userRoles)
                     : saveConfigService.getByName(dateSource, configName, userId, userRoles);
             SaveLogic saveLogic = OBJECT_MAPPER.readValue(saveConfig.getLogic(), SaveLogic.class);
-            result = analysisLogic(dateSource, saveLogic, dataObject, null, userId, userRoles, saveConfig.getLoggingQueries());
+            Object pk = analysisLogic(dateSource, saveLogic, dataObject, null, userId, userRoles, saveConfig.getLoggingQueries());
+            result = dataObject;
+            ((ObjectNode) result).set(saveLogic.getPrimaryKey(), OBJECT_MAPPER.valueToTree(pk));
         } catch (JsonProcessingException e){
             e.printStackTrace();
         }

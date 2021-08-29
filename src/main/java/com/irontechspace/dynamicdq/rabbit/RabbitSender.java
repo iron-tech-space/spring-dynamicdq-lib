@@ -25,10 +25,10 @@ public class RabbitSender {
     public Boolean send(String routingKey, Object data) {
         try {
             rabbitTemplate.convertAndSend(routingKey, data);
-            log.info("Sent message:\t[{}]", data.toString());
+            log.info("Sent message in [{}]:\t{}", routingKey, data.toString());
             return true;
         } catch (Exception e) {
-            log.error("Failed to send message: \t [{}]", data.toString(), e);
+            log.error("Failed to send message in [{}]:\t{}", routingKey, data.toString(), e);
             return false;
         }
     }

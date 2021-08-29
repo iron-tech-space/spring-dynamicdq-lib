@@ -1,7 +1,7 @@
-package com.irontechspace.dynamicdq.executor;
+package com.irontechspace.dynamicdq.executor.task.model;
 
 // Перечисление типы задачи
-public enum ExecutorType {
+public enum TaskType {
     flat,
     hierarchical,
     count,
@@ -11,11 +11,13 @@ public enum ExecutorType {
     save,
     queue,
     equal,
-    not_equal,
-    greater_equal,
-    less_equal,
+    notEqual,
+    greaterEqual,
+    lessEqual,
     greater,
     less,
     log,
     branch,
+    output,
+    event
 }

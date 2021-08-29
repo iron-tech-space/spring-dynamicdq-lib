@@ -2,6 +2,8 @@
 
 - Refactor struct project
 - Add rabbit tasks
+- Add multi operations tasks
+- Add System Events
 
 ## 0.0.32
 

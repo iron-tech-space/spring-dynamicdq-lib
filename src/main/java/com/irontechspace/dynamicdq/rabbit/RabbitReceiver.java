@@ -1,7 +1,8 @@
 package com.irontechspace.dynamicdq.rabbit;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.irontechspace.dynamicdq.rabbit.model.RabbitTask;
+import com.irontechspace.dynamicdq.executor.task.TaskService;
+import com.irontechspace.dynamicdq.executor.task.model.Task;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,21 +13,21 @@ import org.springframework.stereotype.Component;
 public class RabbitReceiver {
 
     @Autowired
-    RabbitService service;
+    TaskService taskService;
 
     public RabbitReceiver() {
     }
 
     @RabbitListener(queues = "${spring.rabbitmq.queues.tasks}")
-    public void receiveTasks(RabbitTask task) {
-        log.info("Received task:\t[{}]", task.toString());
-        service.executeTask(task);
+    public void receiveTasks(Task task) {
+        log.info("Received task:\t{}", task.toString());
+        taskService.executeTask(task);
     }
 
     @RabbitListener(queues = "${spring.rabbitmq.queues.notifications}")
     public void receiveTasks(JsonNode notification) {
         try {
-            log.info("Received notification:\t[{}]", notification.toString());
+            log.info("Received notification:\t{}", notification.toString());
         }
         catch (Exception e){
             e.printStackTrace();
