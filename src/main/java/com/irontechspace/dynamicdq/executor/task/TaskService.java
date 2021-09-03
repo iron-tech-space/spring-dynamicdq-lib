@@ -56,7 +56,7 @@ public class TaskService {
 
                 // START Event
                 if (events != null) executeEvent("start", task.getUserId(), events.getStart(), body);
-                log.info("Execute task type: [{}] body {}", config.getTypeExecutor(), body);
+                log.info("Execute task type: [{}]", config.getTypeExecutor());
 
                 // Любой конфиг кроме выходного (branch пока исключен совсем)
                 if (config.getTypeExecutor() != TaskType.output) {
