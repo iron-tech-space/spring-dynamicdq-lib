@@ -1,3 +1,10 @@
+## 0.0.37
+
+- Refactor struct project
+- Add rabbit tasks
+- Add multi operations tasks
+- Add System Events
+
 ## 0.0.32
 
 - Add `json` type data for SET data
