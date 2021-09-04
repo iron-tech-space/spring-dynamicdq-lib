@@ -1,3 +1,7 @@
+## 0.0.38
+
+- Add log http request
+
 ## 0.0.37
 
 - Refactor struct project
