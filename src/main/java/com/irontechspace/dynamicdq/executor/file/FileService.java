@@ -147,7 +147,7 @@ public class FileService {
      * @param dataObject - дополнительные данные по файлу
      * @return - результат сохранения (throw или id файла в БД)
      */
-    public ResponseEntity<Object> saveFile(String configName, UUID userId, List<String> userRoles, MultipartFile file, JsonNode dataObject) {
+    public Object saveFile(String configName, UUID userId, List<String> userRoles, MultipartFile file, JsonNode dataObject) {
 
         saveConfigService.getByName(configName, userId, userRoles);
 
@@ -199,8 +199,9 @@ public class FileService {
         catch (IOException ex) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Не удалось загрузить файл. Ошибка записи файла на файловую систему", ex); }
 
-        Object key = saveService.saveData(configName, userId, userRoles, fileData);
-        return ResponseEntity.ok().body(key);
+//        Object key = saveService.saveData(configName, userId, userRoles, fileData);
+//        return ResponseEntity.ok().body(key);
+        return saveService.saveData(configName, userId, userRoles, fileData);
     }
 
     /**

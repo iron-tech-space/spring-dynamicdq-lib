@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.irontechspace.dynamicdq.executor.events.SystemEventsService;
+import com.irontechspace.dynamicdq.executor.export.ExportExcelService;
 import com.irontechspace.dynamicdq.executor.task.model.*;
 import com.irontechspace.dynamicdq.executor.query.QueryService;
 import com.irontechspace.dynamicdq.executor.save.SaveService;
@@ -44,11 +45,15 @@ public class TaskService {
     @Autowired
     SystemEventsService systemEventsService;
 
+    @Autowired
+    ExportExcelService exportExcelService;
+
     public Object executeTask(Task task) {
 
 //        Map<String, Object> outputData = new HashMap<>();
         ObjectNode outputData = OBJECT_MAPPER.createObjectNode();
         for (int i = 0; i < task.getConfigs().size(); i++) {
+
 
             // Init config params
             TaskConfig config = task.getConfigs().get(i);
@@ -67,7 +72,7 @@ public class TaskService {
                 if (config.getTypeExecutor() != TaskType.output) {
                     Object res = executeConfig(config.getTypeExecutor(), config.getConfigName(), task.getUserId(), task.getUserRoles(), body, pageable);
                     if (config.getOutput() != null)
-                        taskUtils.setOutputData(config.getOutput().split("\\."), outputData, OBJECT_MAPPER.valueToTree(res));
+                        taskUtils.setOutputData(config.getTypeExecutor(), config.getOutput().split("\\."), outputData, res);
                 }
 
                 // FINISH Event
@@ -122,6 +127,10 @@ public class TaskService {
             case less: return simpleTaskConfigs.compare(TaskType.less, body);
             case log: return simpleTaskConfigs.log(body);
             case event: return executeEvent(userId, body);
+            case createExcel: return exportExcelService.createExcel(body);
+            case addTableExcel: return exportExcelService.addTableExcel(configName, userId, userRoles, body);
+            case addRowExcel: return exportExcelService.addRowExcel(body);
+            case saveExcel: return exportExcelService.saveExcel(configName, userId, userRoles, body);
             default:
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ошибка запроса. Указан не существующий execute type");
         }

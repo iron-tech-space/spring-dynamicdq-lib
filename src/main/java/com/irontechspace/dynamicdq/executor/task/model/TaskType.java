@@ -19,5 +19,9 @@ public enum TaskType {
     log,
     branch,
     output,
-    event
+    event,
+    createExcel,
+    addTableExcel,
+    addRowExcel,
+    saveExcel
 }

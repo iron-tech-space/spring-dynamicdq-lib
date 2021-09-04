@@ -2,8 +2,10 @@ package com.irontechspace.dynamicdq.executor.task;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.irontechspace.dynamicdq.executor.task.model.TaskType;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -50,15 +52,30 @@ public class TaskUtils {
             // Если body строка, то получить значение из outputData
             return getValueByPath(body.asText().split("\\."), outputData, body);
         } else if (body.isObject()) {
+            ObjectNode res = (ObjectNode) body;
             // Если body объект, то переберем все поля
-            body.fields().forEachRemaining(field -> {
-                if (field.getValue().isObject())
-                    // Если после объект, то рекурсивный запрос
-                    resolveOutputData(field.getValue(), outputData);
-                else if (field.getValue().getNodeType() == JsonNodeType.STRING)
+            res.fields().forEachRemaining(field -> {
+                if (field.getValue().getNodeType() == JsonNodeType.STRING)
                     // Если строка, то получить значение из outputData
                     field.setValue(getValueByPath(field.getValue().asText().split("\\."), outputData, field.getValue()));
+                else if (field.getValue().isObject())
+                    // Если после объект, то рекурсивный запрос
+                    field.setValue(resolveOutputData(field.getValue(), outputData));
+                else if(field.getValue().isArray()) {
+                    // Если после массив, то перебор и рекурсивный запрос
+                    ArrayNode an = (ArrayNode) field.getValue();
+                    for (int i = 0; i < an.size(); i++)
+                        an.set(i, resolveOutputData(an.get(i), outputData));
+                    field.setValue(an);
+                }
             });
+            return res;
+        } else if(body.isArray()) {
+            // Если после массив, то перебор и рекурсивный запрос
+            ArrayNode an = (ArrayNode) body;
+            for(int i = 0; i < an.size(); i++)
+                an.set(i, resolveOutputData(an.get(i), outputData));
+            return an;
         }
         return body;
     }
@@ -82,16 +99,20 @@ public class TaskUtils {
         }
     }
 
-    public void setOutputData(String[] path, ObjectNode outputData, JsonNode value){
+    public void setOutputData(TaskType type, String[] path, ObjectNode outputData, Object value){
         if (outputData.isObject() && path.length > 0) {
             // Ноды нет - создаем
             if(outputData.findPath(path[0]).isMissingNode())
                 outputData.set(path[0], OBJECT_MAPPER.createObjectNode());
 
             if(path.length > 1)
-                setOutputData(Arrays.copyOfRange(path, 1, path.length), (ObjectNode) outputData.get(path[0]), value);
-            else
-                outputData.set(path[0], value);
+                setOutputData(type, Arrays.copyOfRange(path, 1, path.length), (ObjectNode) outputData.get(path[0]), value);
+            else {
+                if(type == TaskType.createExcel)
+                    outputData.putPOJO(path[0], value);
+                else
+                    outputData.set(path[0], OBJECT_MAPPER.valueToTree(value));
+            }
         }
     }
 
