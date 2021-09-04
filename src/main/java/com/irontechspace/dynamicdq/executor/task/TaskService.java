@@ -2,6 +2,7 @@ package com.irontechspace.dynamicdq.executor.task;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.irontechspace.dynamicdq.executor.events.SystemEventsService;
 import com.irontechspace.dynamicdq.executor.task.model.*;
 import com.irontechspace.dynamicdq.executor.query.QueryService;
@@ -35,6 +36,9 @@ public class TaskService {
     RabbitSender rabbitSender;
 
     @Autowired
+    SimpleTaskConfigs simpleTaskConfigs;
+
+    @Autowired
     TaskUtils taskUtils;
 
     @Autowired
@@ -42,7 +46,8 @@ public class TaskService {
 
     public Object executeTask(Task task) {
 
-        Map<String, Object> outputData = new HashMap<>();
+//        Map<String, Object> outputData = new HashMap<>();
+        ObjectNode outputData = OBJECT_MAPPER.createObjectNode();
         for (int i = 0; i < task.getConfigs().size(); i++) {
 
             // Init config params
@@ -61,7 +66,8 @@ public class TaskService {
                 // Любой конфиг кроме выходного (branch пока исключен совсем)
                 if (config.getTypeExecutor() != TaskType.output) {
                     Object res = executeConfig(config.getTypeExecutor(), config.getConfigName(), task.getUserId(), task.getUserRoles(), body, pageable);
-                    if (config.getOutput() != null) outputData.put(config.getOutput(), res);
+                    if (config.getOutput() != null)
+                        taskUtils.setOutputData(config.getOutput().split("\\."), outputData, OBJECT_MAPPER.valueToTree(res));
                 }
 
                 // FINISH Event
@@ -107,13 +113,13 @@ public class TaskService {
             case save:
                 return saveService.saveData(configName, userId, userRoles, body);
             case queue: return rabbitSender.send(configName, body);
-            case equal: return taskUtils.compare(TaskType.equal, body);
-            case notEqual: return taskUtils.compare(TaskType.notEqual, body);
-            case greaterEqual: return taskUtils.compare(TaskType.greaterEqual, body);
-            case lessEqual: return taskUtils.compare(TaskType.lessEqual, body);
-            case greater: return taskUtils.compare(TaskType.greater, body);
-            case less: return taskUtils.compare(TaskType.less, body);
-            case log: return taskUtils.log(body);
+            case equal: return simpleTaskConfigs.compare(TaskType.equal, body);
+            case notEqual: return simpleTaskConfigs.compare(TaskType.notEqual, body);
+            case greaterEqual: return simpleTaskConfigs.compare(TaskType.greaterEqual, body);
+            case lessEqual: return simpleTaskConfigs.compare(TaskType.lessEqual, body);
+            case greater: return simpleTaskConfigs.compare(TaskType.greater, body);
+            case less: return simpleTaskConfigs.compare(TaskType.less, body);
+            case log: return simpleTaskConfigs.log(body);
             case event: return executeEvent(userId, body);
             default:
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ошибка запроса. Указан не существующий execute type");

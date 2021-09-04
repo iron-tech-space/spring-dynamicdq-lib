@@ -4,14 +4,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.irontechspace.dynamicdq.executor.task.model.TaskType;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Log4j2
 @Service
@@ -23,7 +24,7 @@ public class TaskUtils {
         if(body.getNodeType() == JsonNodeType.STRING){
             String value = body.asText();
             if(outputData.containsKey(value)){
-                return new ObjectMapper().valueToTree(outputData.get(value));
+                return OBJECT_MAPPER.valueToTree(outputData.get(value));
             }
         } else if (body.isObject()) {
             ObjectNode newBody = (ObjectNode) body;
@@ -35,7 +36,7 @@ public class TaskUtils {
                     String value = b.getValue().asText();
                     if (outputData.containsKey(value)) {
                         // log.info("replace [{}]", value);
-                        b.setValue(new ObjectMapper().valueToTree(outputData.get(value)));
+                        b.setValue(OBJECT_MAPPER.valueToTree(outputData.get(value)));
                     }
                 }
             });
@@ -44,12 +45,54 @@ public class TaskUtils {
         return body;
     }
 
-    public JsonNode pageableToJson (Pageable pageable){
-        ObjectNode jsonPageable = OBJECT_MAPPER.createObjectNode();
-        jsonPageable.put("page", pageable.getPageNumber());
-        jsonPageable.put("size", pageable.getPageSize());
-        jsonPageable.put("sort", pageable.getSort().isUnsorted() ? null : pageable.getSort().toString());
-        return jsonPageable;
+    public JsonNode resolveOutputData(JsonNode body, ObjectNode outputData) {
+        if(body.getNodeType() == JsonNodeType.STRING){
+            // Если body строка, то получить значение из outputData
+            return getValueByPath(body.asText().split("\\."), outputData);
+        } else if (body.isObject()) {
+            // Если body объект, то переберем все поля
+            body.fields().forEachRemaining(field -> {
+                if (field.getValue().isObject())
+                    // Если после объект, то рекурсивный запрос
+                    resolveOutputData(field.getValue(), outputData);
+                else if (field.getValue().getNodeType() == JsonNodeType.STRING)
+                    // Если строка, то получить значение из outputData
+                    field.setValue(getValueByPath(field.getValue().asText().split("\\."), outputData));
+            });
+        }
+        return body;
+    }
+
+    public JsonNode getValueByPath(String[] path, JsonNode outputData) {
+        if (outputData.isObject() && path.length > 0) {
+            AtomicReference<JsonNode> res = new AtomicReference<>(null);
+//            for(Map.Entry<String, JsonNode> field : outputData.fields()){
+            outputData.fields().forEachRemaining(field -> {
+                if(field.getKey().equals(path[0])){
+                    if(path.length > 1) {
+                        res.set(getValueByPath(Arrays.copyOfRange(path, 1, path.length), field.getValue()));
+                    } else {
+                        res.set(field.getValue());
+                    }
+                }
+            });
+            return res.get();
+        } else {
+            return null;
+        }
+    }
+
+    public void setOutputData(String[] path, ObjectNode outputData, JsonNode value){
+        if (outputData.isObject() && path.length > 0) {
+            outputData.fields().forEachRemaining(field -> {
+                if(field.getKey().equals(path[0])){
+                    if(path.length > 1)
+                        setOutputData(Arrays.copyOfRange(path, 1, path.length), (ObjectNode) field.getValue(), value);
+                    else
+                        field.setValue(value);
+                }
+            });
+        }
     }
 
     public Pageable jsonToPageable (JsonNode jsonPageable){
@@ -68,56 +111,5 @@ public class TaskUtils {
         return pageable;
     }
 
-    public Object log(JsonNode body) {
-        log.info(body);
-        return null;
-    }
 
-    public Boolean compare(TaskType operation, JsonNode body) {
-        String type = body.get("type").asText();
-        // log.info("Equal type: [{}]", type);
-        switch (type){
-            case "text": return compareString(operation, body.get("leftCondition").asText(), body.get("rightCondition").asText());
-            case "bool": return compareBoolean(operation, body.get("leftCondition").asBoolean(), body.get("rightCondition").asBoolean());
-            case "int":  return compareInt(operation, body.get("leftCondition").asInt(), body.get("rightCondition").asInt());
-            case "double": return compareDouble(operation, body.get("leftCondition").asDouble(), body.get("rightCondition").asDouble());
-            default: return false;
-        }
-    }
-
-    private Boolean compareString(TaskType operation, String leftCondition, String rightCondition) {
-        switch (operation) {
-            case equal: return leftCondition.equals(rightCondition);
-            case notEqual: return !leftCondition.equals(rightCondition); //not_equal
-            default: return false;
-        }
-    }
-
-    private Boolean compareBoolean(TaskType operation, boolean leftCondition, boolean rightCondition) {
-        switch (operation) {
-            case equal: return leftCondition == rightCondition;
-            case notEqual: return leftCondition != rightCondition;
-            default: return false;
-        }
-    }
-
-    private Boolean compareInt(TaskType operation, int leftCondition, int rightCondition) {
-        return compareNumber(operation, leftCondition, rightCondition);
-    }
-
-    private Boolean compareDouble(TaskType operation, double leftCondition, double rightCondition) {
-        return compareNumber(operation, leftCondition, rightCondition);
-    }
-
-    private Boolean compareNumber(TaskType operation, double leftCondition, double rightCondition) {
-        switch (operation) {
-            case equal: return leftCondition == rightCondition;
-            case notEqual: return leftCondition != rightCondition;
-            case greaterEqual: return leftCondition >= rightCondition;
-            case lessEqual: return leftCondition <= rightCondition;
-            case greater: return leftCondition > rightCondition;
-            case less: return leftCondition < rightCondition;
-            default: return false;
-        }
-    }
 }

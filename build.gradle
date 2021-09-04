@@ -30,6 +30,7 @@ repositories {
 
 dependencies {
 	compile("org.projectlombok:lombok")
+	compile("org.apache.poi:poi-ooxml:5.0.0")
 	compile("org.aspectj:aspectjtools:1.9.5")
 	compile("org.springframework.boot:spring-boot-starter-web:${springBootVersion}")
 	compile("org.springframework.boot:spring-boot-starter-amqp:${springBootVersion}")
@@ -37,6 +38,8 @@ dependencies {
 	compile("org.springframework.boot:spring-boot-starter-data-jdbc:${springBootVersion}")
 	compile("org.springframework.security:spring-security-crypto")
 	compile("org.postgresql:postgresql:${postgresqlVersion}")
+
+	compile("org.springframework.boot:spring-boot-starter-test:${springBootVersion}")
 }
 
 compileJava {
