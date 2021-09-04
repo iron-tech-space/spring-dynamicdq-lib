@@ -48,7 +48,7 @@ public class TaskUtils {
     public JsonNode resolveOutputData(JsonNode body, ObjectNode outputData) {
         if(body.getNodeType() == JsonNodeType.STRING){
             // Если body строка, то получить значение из outputData
-            return getValueByPath(body.asText().split("\\."), outputData);
+            return getValueByPath(body.asText().split("\\."), outputData, body);
         } else if (body.isObject()) {
             // Если body объект, то переберем все поля
             body.fields().forEachRemaining(field -> {
@@ -57,20 +57,20 @@ public class TaskUtils {
                     resolveOutputData(field.getValue(), outputData);
                 else if (field.getValue().getNodeType() == JsonNodeType.STRING)
                     // Если строка, то получить значение из outputData
-                    field.setValue(getValueByPath(field.getValue().asText().split("\\."), outputData));
+                    field.setValue(getValueByPath(field.getValue().asText().split("\\."), outputData, field.getValue()));
             });
         }
         return body;
     }
 
-    public JsonNode getValueByPath(String[] path, JsonNode outputData) {
+    public JsonNode getValueByPath(String[] path, JsonNode outputData, JsonNode defaultValue) {
         if (outputData.isObject() && path.length > 0) {
-            AtomicReference<JsonNode> res = new AtomicReference<>(null);
+            AtomicReference<JsonNode> res = new AtomicReference<>(defaultValue);
 //            for(Map.Entry<String, JsonNode> field : outputData.fields()){
             outputData.fields().forEachRemaining(field -> {
                 if(field.getKey().equals(path[0])){
                     if(path.length > 1) {
-                        res.set(getValueByPath(Arrays.copyOfRange(path, 1, path.length), field.getValue()));
+                        res.set(getValueByPath(Arrays.copyOfRange(path, 1, path.length), field.getValue(), defaultValue));
                     } else {
                         res.set(field.getValue());
                     }
@@ -84,14 +84,14 @@ public class TaskUtils {
 
     public void setOutputData(String[] path, ObjectNode outputData, JsonNode value){
         if (outputData.isObject() && path.length > 0) {
-            outputData.fields().forEachRemaining(field -> {
-                if(field.getKey().equals(path[0])){
-                    if(path.length > 1)
-                        setOutputData(Arrays.copyOfRange(path, 1, path.length), (ObjectNode) field.getValue(), value);
-                    else
-                        field.setValue(value);
-                }
-            });
+            // Ноды нет - создаем
+            if(outputData.findPath(path[0]).isMissingNode())
+                outputData.set(path[0], OBJECT_MAPPER.createObjectNode());
+
+            if(path.length > 1)
+                setOutputData(Arrays.copyOfRange(path, 1, path.length), (ObjectNode) outputData.get(path[0]), value);
+            else
+                outputData.set(path[0], value);
         }
     }
 

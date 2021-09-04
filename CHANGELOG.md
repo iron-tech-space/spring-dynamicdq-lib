@@ -1,6 +1,7 @@
 ## 0.0.38
 
 - Add log http request
+- Fix def task body and Fix set output
 
 ## 0.0.37
 

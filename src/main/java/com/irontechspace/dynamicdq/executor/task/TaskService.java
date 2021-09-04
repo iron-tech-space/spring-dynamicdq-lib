@@ -74,7 +74,8 @@ public class TaskService {
                 if (events != null) executeEvent("finish", task.getUserId(), events.getFinish(), body);
 
                 // Выходной конфиг
-                if (config.getTypeExecutor() == TaskType.output) return body;
+                if (config.getTypeExecutor() == TaskType.output)
+                    return body;
             } catch (Exception e) {
                 e.printStackTrace();
                 if (events != null)
