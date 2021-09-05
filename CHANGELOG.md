@@ -2,6 +2,13 @@
 
 - Add log http request
 - Fix def task body and Fix set output
+- Add read write array
+- Add execute JS code
+- Add props to `addTableExcel` operation 
+  - hiddenHeader 
+  - headerHeight 
+  - rowHeight 
+  - dateFormat
 
 ## 0.0.37
 

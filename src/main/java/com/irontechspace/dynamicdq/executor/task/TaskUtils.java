@@ -12,9 +12,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
 import java.util.Arrays;
-import java.util.Map;
+import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Log4j2
 @Service
@@ -22,42 +26,19 @@ public class TaskUtils {
 
     private final static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    public JsonNode resolveOutputData(JsonNode body, Map<String, Object> outputData) {
-        if(body.getNodeType() == JsonNodeType.STRING){
-            String value = body.asText();
-            if(outputData.containsKey(value)){
-                return OBJECT_MAPPER.valueToTree(outputData.get(value));
-            }
-        } else if (body.isObject()) {
-            ObjectNode newBody = (ObjectNode) body;
-            newBody.fields().forEachRemaining(b -> {
-                if (b.getValue().isObject()){
-                    resolveOutputData(b.getValue(), outputData);
-                }
-                else if (b.getValue().getNodeType() == JsonNodeType.STRING) {
-                    String value = b.getValue().asText();
-                    if (outputData.containsKey(value)) {
-                        // log.info("replace [{}]", value);
-                        b.setValue(OBJECT_MAPPER.valueToTree(outputData.get(value)));
-                    }
-                }
-            });
-            return newBody;
-        }
-        return body;
-    }
-
-    public JsonNode resolveOutputData(JsonNode body, ObjectNode outputData) {
+    public JsonNode resolveOutputData(JsonNode body, ObjectNode outputData){
         if(body.getNodeType() == JsonNodeType.STRING){
             // Если body строка, то получить значение из outputData
-            return getValueByPath(body.asText().split("\\."), outputData, body);
+//            return getValueByPath(body.asText().split("\\."), outputData, body);
+            return getValueByPath(body.asText(), outputData, body);
         } else if (body.isObject()) {
             ObjectNode res = (ObjectNode) body;
             // Если body объект, то переберем все поля
             res.fields().forEachRemaining(field -> {
                 if (field.getValue().getNodeType() == JsonNodeType.STRING)
                     // Если строка, то получить значение из outputData
-                    field.setValue(getValueByPath(field.getValue().asText().split("\\."), outputData, field.getValue()));
+//                    field.setValue(getValueByPath(field.getValue().asText().split("\\."), outputData, field.getValue()));
+                    field.setValue(getValueByPath(field.getValue().asText(), outputData, field.getValue()));
                 else if (field.getValue().isObject())
                     // Если после объект, то рекурсивный запрос
                     field.setValue(resolveOutputData(field.getValue(), outputData));
@@ -80,24 +61,55 @@ public class TaskUtils {
         return body;
     }
 
-    public JsonNode getValueByPath(String[] path, JsonNode outputData, JsonNode defaultValue) {
-        if (outputData.isObject() && path.length > 0) {
-            AtomicReference<JsonNode> res = new AtomicReference<>(defaultValue);
-//            for(Map.Entry<String, JsonNode> field : outputData.fields()){
-            outputData.fields().forEachRemaining(field -> {
-                if(field.getKey().equals(path[0])){
-                    if(path.length > 1) {
-                        res.set(getValueByPath(Arrays.copyOfRange(path, 1, path.length), field.getValue(), defaultValue));
-                    } else {
-                        res.set(field.getValue());
-                    }
+    public JsonNode getValueByPath(String path, JsonNode outputData, JsonNode defaultValue) {
+        Matcher scriptMatcher = Pattern.compile("JS\\{(.*?)\\}JS").matcher(path);
+        while (scriptMatcher.find()) {
+            // Скрипт без обработки
+            String rawScript = path.substring(scriptMatcher.start() + 3, scriptMatcher.end() - 3);
+            // Исполняемы скрипт
+            String executeScript = rawScript;
+            Matcher valueMatcher = Pattern.compile("\\[(.*?)\\]").matcher(rawScript);
+            ScriptEngineManager mgr = new ScriptEngineManager();
+            ScriptEngine jsEngine = mgr.getEngineByName("JavaScript");
+            try {
+                while (valueMatcher.find()) {
+                    String valuePath = rawScript.substring(valueMatcher.start() + 1, valueMatcher.end() - 1);
+                    String replacePath = rawScript.substring(valueMatcher.start(), valueMatcher.end());
+                    String replaceValue = OBJECT_MAPPER.writeValueAsString(getValueByPath(valuePath.split("\\."), outputData, defaultValue));
+                    executeScript = executeScript.replace(replacePath, replaceValue);
                 }
-            });
+                Object result = jsEngine.eval(executeScript);
+                path = path.replace(path.substring(scriptMatcher.start(), scriptMatcher.end()), OBJECT_MAPPER.writeValueAsString(result));
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+        return getValueByPath(path.split("\\."), outputData, defaultValue);
+    }
+
+    public JsonNode getValueByPath(String[] path, JsonNode outputData, JsonNode defaultValue) {
+        if (path.length > 0) {
+            AtomicReference<JsonNode> res = new AtomicReference<>(defaultValue);
+            if (outputData.isObject()) {
+                outputData.fields().forEachRemaining(field -> {
+                    if (field.getKey().equals(path[0])) {
+                        res.set( path.length > 1
+                                ? getValueByPath(Arrays.copyOfRange(path, 1, path.length), field.getValue(), defaultValue)
+                                : field.getValue() );
+                    } // Инга )
+                });
+            } else if (outputData.isArray())
+                res.set( path.length > 1
+                        ? getValueByPath(Arrays.copyOfRange(path, 1, path.length), outputData.get(path[0]), defaultValue)
+                        : outputData.get(Integer.parseInt(path[0])) );
             return res.get();
         } else {
             return null;
         }
     }
+//    private void execJS() {
+
+//    }
 
     public void setOutputData(TaskType type, String[] path, ObjectNode outputData, Object value){
         if (outputData.isObject() && path.length > 0) {
@@ -110,8 +122,14 @@ public class TaskUtils {
             else {
                 if(type == TaskType.createExcel)
                     outputData.putPOJO(path[0], value);
-                else
-                    outputData.set(path[0], OBJECT_MAPPER.valueToTree(value));
+                else {
+                    JsonNode _value = OBJECT_MAPPER.valueToTree(value);
+//                    OBJECT_MAPPER.createObjectNode().put("rowIndex", startRowIndex + data.size()).put("colIndex", startColIndex + fields.size());
+                    if(_value.isArray())
+                        outputData.set(path[0], OBJECT_MAPPER.createObjectNode().setAll(new HashMap<String, JsonNode>() {{ put("rows", _value); put("length", OBJECT_MAPPER.valueToTree(_value.size()) ); }}) );
+                    else
+                        outputData.set(path[0], _value);
+                }
             }
         }
     }
