@@ -7,9 +7,14 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.irontechspace.dynamicdq.configurator.query.QueryConfigService;
 import com.irontechspace.dynamicdq.configurator.query.model.QueryConfig;
 import com.irontechspace.dynamicdq.configurator.query.model.QueryField;
+import com.irontechspace.dynamicdq.executor.export.model.ExcelBorder;
+import com.irontechspace.dynamicdq.executor.export.model.ExcelCol;
+import com.irontechspace.dynamicdq.executor.export.model.ExcelFont;
 import com.irontechspace.dynamicdq.executor.file.FileService;
 import lombok.extern.log4j.Log4j2;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.ss.util.RegionUtil;
 import org.apache.poi.xssf.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockMultipartFile;
@@ -23,6 +28,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+
+import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
 
 @Log4j2
 @Service
@@ -74,6 +81,7 @@ public class ExportExcelService {
         try {
             XSSFWorkbook workbook = OBJECT_MAPPER.treeToValue(body.get("file"), XSSFWorkbook.class);
             Sheet sheet = workbook.getSheet(body.get("sheet").asText());
+            CellRangeAddress region;
             ArrayNode data = (ArrayNode) body.get("data");
             boolean hiddenHeader = !body.path("hiddenHeader").isMissingNode() && body.get("hiddenHeader").asBoolean();
             float headerHeight = body.path("headerHeight").isMissingNode() ? -1 : body.get("headerHeight").floatValue();
@@ -87,63 +95,117 @@ public class ExportExcelService {
                 }
             } else {
                 Row headers = Optional.ofNullable(sheet.getRow(startRowIndex)).orElse(sheet.createRow(startRowIndex));
-                startRowIndex++;
                 headers.setHeightInPoints(headerHeight);
-                for (int colIndex = startColIndex; colIndex < fields.size(); colIndex++) {
-                    ExcelCol field = fields.get(colIndex);
-                    sheet.setColumnWidth(colIndex, pixel2WidthUnits(field.getWidth().intValue()));
-
-                    Cell cell = headers.createCell(colIndex);
+                Integer maxRowSpan = 1;
+                for (int fIdx = startColIndex, colIdx = startColIndex;  fIdx < fields.size(); fIdx++) {
+                    ExcelCol field = fields.get(fIdx);
+                    Cell cell = headers.createCell(colIdx);
                     cell.setCellStyle(getHeaderStyle(workbook, field));
                     cell.setCellValue(field.getHeader());
+
+                    sheet.setColumnWidth(colIdx, pixel2WidthUnits(field.getWidth().intValue()));
+                    if(field.getColSpan() > 1 || field.getRowSpan() > 1) {
+                        region = new CellRangeAddress(startRowIndex, startRowIndex + field.getRowSpan() - 1, colIdx, colIdx + field.getColSpan() - 1);
+                        sheet.addMergedRegion(region);
+                        maxRowSpan = field.getRowSpan() > maxRowSpan ? field.getRowSpan() : maxRowSpan;
+                    } else {
+                        region = new CellRangeAddress(startRowIndex, startRowIndex, colIdx, colIdx);
+                    }
+                    if(field.getHeaderStyle() != null)
+                        setBorders(field.getHeaderStyle().getBorder(), region, sheet);
+                    colIdx += field.getColSpan();
                 }
+                startRowIndex += maxRowSpan;
             }
 
-            for (int dataIndex = 0; dataIndex < data.size(); dataIndex++) {
+            for (int dataIndex = 0, rowIndex = startRowIndex; dataIndex < data.size(); dataIndex++, rowIndex++) {
                 JsonNode rowData = data.get(dataIndex);
-                Row row = Optional.ofNullable(sheet.getRow(startRowIndex + dataIndex)).orElse(sheet.createRow(startRowIndex + dataIndex));
+                Row row = Optional.ofNullable(sheet.getRow(rowIndex)).orElse(sheet.createRow(startRowIndex + dataIndex));
                 row.setHeightInPoints(rowHeight);
-                for (int colIndex = startColIndex; colIndex < fields.size(); colIndex++) {
-                    ExcelCol field = fields.get(colIndex);
-                    Cell cell = row.createCell(colIndex);
+                for (int fIdx = startColIndex, colIdx = startColIndex; fIdx < fields.size(); fIdx++) {
+                    ExcelCol field = fields.get(fIdx);
+                    Cell cell = row.createCell(colIdx);
                     cell.setCellStyle(getCellStyle(workbook, field));
                     setCellValue(cell, field, rowData);
+
+                    if(field.getColSpan() > 1) {
+                        region = new CellRangeAddress(rowIndex, rowIndex, colIdx, colIdx + field.getColSpan() - 1);
+                        sheet.addMergedRegion(region);
+                    } else {
+                        region = new CellRangeAddress(rowIndex, rowIndex, colIdx, colIdx);
+                    }
+                    if(field.getCellStyle() != null)
+                        setBorders(field.getCellStyle().getBorder(), region, sheet);
+                    colIdx += field.getColSpan();
                 }
             }
 
             return OBJECT_MAPPER.createObjectNode().put("rowIndex", startRowIndex + data.size()).put("colIndex", startColIndex + fields.size());
         } catch (IOException e) {
 //            e.printStackTrace();
-            log.error(e);
+            logException(log, e);
             return OBJECT_MAPPER.nullNode();
         }
     }
 
-    private XSSFFont getHeaderFont(XSSFWorkbook workbook) {
+    private XSSFFont getFont(XSSFWorkbook workbook, ExcelFont excelFont) {
         XSSFFont font = workbook.createFont();
-        font.setBold(true);
+        if(excelFont != null){
+            if(excelFont.getSize() != null)
+                font.setFontHeight(excelFont.getSize());
+            if(excelFont.getBold() != null)
+                font.setBold(excelFont.getBold());
+        }
         return font;
     }
 
     private CellStyle getHeaderStyle(XSSFWorkbook workbook, ExcelCol field) {
-        CellStyle style = getCellStyle(workbook, field);
-        style.setFont(getHeaderFont(workbook));
+        CellStyle style = workbook.createCellStyle();
+        setGeneralStyle(workbook, style, field);
+        if(field.getHeaderStyle() != null)
+            style.setFont(getFont(workbook, field.getHeaderStyle().getFont()));
         return style;
     }
 
     private CellStyle getCellStyle(XSSFWorkbook workbook, ExcelCol field) {
         CellStyle style = workbook.createCellStyle();
-        if(Arrays.asList("date", "time", "timestamp").contains(field.getTypeData())) {
-            style.setDataFormat(workbook.getCreationHelper().createDataFormat().getFormat(field.getDateFormat()));
+        setGeneralStyle(workbook, style, field);
+        if(field.getCellStyle() != null)
+            style.setFont(getFont(workbook, field.getCellStyle().getFont()));
+
+        return style;
+    }
+
+    private void setGeneralStyle(XSSFWorkbook workbook, CellStyle style, ExcelCol field){
+        if(Arrays.asList("date", "time", "timestamp", "double").contains(field.getTypeData())) {
+            style.setDataFormat(workbook.getCreationHelper().createDataFormat().getFormat(field.getDataFormat()));
         }
         style.setAlignment(HorizontalAlignment.valueOf(field.getAlign().toUpperCase()));
         style.setVerticalAlignment(VerticalAlignment.CENTER);
-        return style;
+    }
+
+    private void setBorders(ExcelBorder border, CellRangeAddress region, Sheet sheet) {
+        if(border != null){
+            if(border.getTop() != null && border.getTop()) {
+                RegionUtil.setBorderTop(BorderStyle.THIN, region, sheet);
+            }
+            if(border.getRight() != null && border.getRight()){
+                RegionUtil.setBorderRight(BorderStyle.THIN, region, sheet);
+            }
+            if(border.getBottom() != null && border.getBottom()){
+                RegionUtil.setBorderBottom(BorderStyle.THIN, region, sheet);
+            }
+            if(border.getLeft() != null && border.getLeft()){
+                RegionUtil.setBorderLeft(BorderStyle.THIN, region, sheet);
+            }
+        }
     }
 
     private void setCellValue(Cell cell, ExcelCol field, JsonNode rowData){
         if(Arrays.asList("date", "time", "timestamp").contains(field.getTypeData())) {
             cell.setCellValue(LocalDateTime.parse(rowData.get(field.getName()).asText(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")));
+        } else if("double".equals(field.getTypeData())){
+            cell.setCellValue(rowData.get(field.getName()).asDouble());
         } else {
             cell.setCellValue(rowData.get(field.getName()).asText());
         }
@@ -163,7 +225,7 @@ public class ExportExcelService {
             return true;
         } catch (IOException e) {
 //            e.printStackTrace();
-            log.error(e);
+            logException(log, e);
             return false;
         }
     }
@@ -196,7 +258,7 @@ public class ExportExcelService {
             return fileService.saveFile(configName, userId, userRoles, multipartFile, OBJECT_MAPPER.createObjectNode());
         } catch (IOException e) {
 //            e.printStackTrace();
-            log.error(e);
+            logException(log, e);
             return null;
         }
     }

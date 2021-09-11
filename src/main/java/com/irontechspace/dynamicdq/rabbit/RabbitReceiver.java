@@ -8,6 +8,8 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
+
 @Log4j2
 @Component
 public class RabbitReceiver {
@@ -31,7 +33,7 @@ public class RabbitReceiver {
         }
         catch (Exception e){
 //            e.printStackTrace();
-            log.error(e);
+            logException(log, e);
         }
     }
 

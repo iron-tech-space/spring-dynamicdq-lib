@@ -20,6 +20,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
+
 @Log4j2
 @Service
 public class TaskUtils {
@@ -82,7 +84,7 @@ public class TaskUtils {
                 path = path.replace(path.substring(scriptMatcher.start(), scriptMatcher.end()), OBJECT_MAPPER.writeValueAsString(result));
             } catch (Exception e) {
 //                ex.printStackTrace();
-                log.error(e);
+                logException(log, e);
             }
         }
         return getValueByPath(path.split("\\."), outputData, defaultValue);

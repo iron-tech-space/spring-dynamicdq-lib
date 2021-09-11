@@ -32,6 +32,8 @@ import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
+
 @Log4j2
 @Service
 public class FileService {
@@ -279,9 +281,6 @@ public class FileService {
     private void saveFileIntoStorageDirectory(String absolutePath, byte[] content) throws IOException {
         try (FileOutputStream fileStream = new FileOutputStream(absolutePath)) {
             fileStream.write(content);
-        } catch (IOException e) {
-            log.error(String.format("File %s not saved", absolutePath), e);
-            throw e;
         }
     }
 

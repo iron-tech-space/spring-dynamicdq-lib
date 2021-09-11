@@ -15,6 +15,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 
+import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
 import static com.irontechspace.dynamicdq.utils.SqlUtils.inspect;
 
 @Log4j2
@@ -41,7 +42,7 @@ public class QueryConfigRowMapper implements RowMapper<QueryConfig> {
                     bw.setPropertyValue(field, value);
             } catch (Exception e) {
 //                e.printStackTrace();
-                log.error(e);
+                logException(log, e);
             }
         }
         return mappedObject;

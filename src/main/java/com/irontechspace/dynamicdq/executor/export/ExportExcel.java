@@ -9,6 +9,8 @@ import org.springframework.mock.web.MockMultipartFile;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
+import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
+
 @Log4j2
 public class ExportExcel {
     private XSSFWorkbook workbook;
@@ -24,7 +26,7 @@ public class ExportExcel {
             MultipartFile multipartFile = new MockMultipartFile("file", "file", "text/plain", bos.toByteArray());
         } catch (IOException e) {
 //            e.printStackTrace();
-            log.error(e);
+            logException(log, e);
         }
     }
 }
