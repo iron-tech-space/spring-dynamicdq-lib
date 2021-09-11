@@ -60,7 +60,8 @@ public class DefaultAdvice
             PSQLException.class
     })
     public ResponseEntity<Object> handleException(Exception ex) {
-        ex.printStackTrace();
+        log.error(ex);
+//        ex.printStackTrace();
 
         /** HTTP EXCEPTION */
         if (ex instanceof HttpRequestMethodNotSupportedException)

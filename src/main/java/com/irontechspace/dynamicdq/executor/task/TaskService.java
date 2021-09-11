@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
+
 @Log4j2
 @Service
 public class TaskService {
@@ -82,7 +84,7 @@ public class TaskService {
                 if (config.getTypeExecutor() == TaskType.output)
                     return body;
             } catch (Exception e) {
-                e.printStackTrace();
+                logException(log, e);
                 if (events != null)
                     executeEvent("error", task.getUserId(), events.getError(), OBJECT_MAPPER.createObjectNode().put("error", e.getMessage()));
             }

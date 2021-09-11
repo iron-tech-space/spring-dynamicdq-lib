@@ -49,7 +49,8 @@ public class QueryRowMapper implements RowMapper<ObjectNode> {
                             else
                                 rowObject.put(fieldName, OBJECT_MAPPER.nullNode());
                         } catch (JsonProcessingException e) {
-                            e.printStackTrace();
+//                            e.printStackTrace();
+                            log.error(e);
                             rowObject.put(fieldName, OBJECT_MAPPER.nullNode());
                         }
                         break;

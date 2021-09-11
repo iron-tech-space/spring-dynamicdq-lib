@@ -57,7 +57,8 @@ public class SaveService {
             result = dataObject;
             ((ObjectNode) result).set(saveLogic.getPrimaryKey(), OBJECT_MAPPER.valueToTree(pk));
         } catch (JsonProcessingException e){
-            e.printStackTrace();
+//            e.printStackTrace();
+            log.error(e);
         }
         return result;
     }

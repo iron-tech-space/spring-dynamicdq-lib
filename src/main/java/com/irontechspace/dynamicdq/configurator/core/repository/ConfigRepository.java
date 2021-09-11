@@ -72,7 +72,8 @@ public class ConfigRepository {
             params.addValue( "columnData", OBJECT_MAPPER.writeValueAsString(queryConfig));
             jdbcTemplate.queryForObject(INSERT_HISTORY, params, UUID.class);
         } catch (JsonProcessingException ex) {
-            ex.printStackTrace();
+//            ex.printStackTrace();
+            log.error(ex);
         }
     }
 

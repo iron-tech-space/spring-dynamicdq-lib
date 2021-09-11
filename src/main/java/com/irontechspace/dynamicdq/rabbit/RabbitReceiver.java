@@ -30,7 +30,8 @@ public class RabbitReceiver {
             log.info("Received notification:\t{}", notification.toString());
         }
         catch (Exception e){
-            e.printStackTrace();
+//            e.printStackTrace();
+            log.error(e);
         }
     }
 

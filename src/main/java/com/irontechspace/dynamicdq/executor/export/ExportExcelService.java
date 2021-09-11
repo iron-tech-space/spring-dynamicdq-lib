@@ -113,7 +113,8 @@ public class ExportExcelService {
 
             return OBJECT_MAPPER.createObjectNode().put("rowIndex", startRowIndex + data.size()).put("colIndex", startColIndex + fields.size());
         } catch (IOException e) {
-            e.printStackTrace();
+//            e.printStackTrace();
+            log.error(e);
             return OBJECT_MAPPER.nullNode();
         }
     }
@@ -161,7 +162,8 @@ public class ExportExcelService {
             // sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 3));
             return true;
         } catch (IOException e) {
-            e.printStackTrace();
+//            e.printStackTrace();
+            log.error(e);
             return false;
         }
     }
@@ -193,7 +195,8 @@ public class ExportExcelService {
             // (String configName, UUID userId, List<String> userRoles, MultipartFile file, JsonNode dataObject)
             return fileService.saveFile(configName, userId, userRoles, multipartFile, OBJECT_MAPPER.createObjectNode());
         } catch (IOException e) {
-            e.printStackTrace();
+//            e.printStackTrace();
+            log.error(e);
             return null;
         }
     }

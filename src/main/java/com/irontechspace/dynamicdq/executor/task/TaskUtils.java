@@ -80,8 +80,9 @@ public class TaskUtils {
                 }
                 Object result = jsEngine.eval(executeScript);
                 path = path.replace(path.substring(scriptMatcher.start(), scriptMatcher.end()), OBJECT_MAPPER.writeValueAsString(result));
-            } catch (Exception ex) {
-                ex.printStackTrace();
+            } catch (Exception e) {
+//                ex.printStackTrace();
+                log.error(e);
             }
         }
         return getValueByPath(path.split("\\."), outputData, defaultValue);

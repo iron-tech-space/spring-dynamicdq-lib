@@ -40,7 +40,8 @@ public class QueryConfigRowMapper implements RowMapper<QueryConfig> {
                 } else
                     bw.setPropertyValue(field, value);
             } catch (Exception e) {
-                e.printStackTrace();
+//                e.printStackTrace();
+                log.error(e);
             }
         }
         return mappedObject;
