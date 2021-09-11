@@ -34,7 +34,6 @@ dependencies {
 	compile("org.aspectj:aspectjtools:1.9.5")
 	compile("org.springframework.boot:spring-boot-starter-web:${springBootVersion}")
 	compile("org.springframework.boot:spring-boot-starter-amqp:${springBootVersion}")
-	compile("org.springframework.boot:spring-boot-starter-activemq:${springBootVersion}")
 	compile("org.springframework.boot:spring-boot-starter-data-jdbc:${springBootVersion}")
 	compile("org.springframework.security:spring-security-crypto")
 	compile("org.postgresql:postgresql:${postgresqlVersion}")
