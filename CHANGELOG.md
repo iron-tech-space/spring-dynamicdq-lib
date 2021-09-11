@@ -9,6 +9,9 @@
   - headerHeight 
   - rowHeight 
   - dateFormat
+- Remove ActiveMQ
+- Fix log exception
+- Add excel style
 
 ## 0.0.37
 
