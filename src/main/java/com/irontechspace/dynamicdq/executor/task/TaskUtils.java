@@ -32,7 +32,7 @@ public class TaskUtils {
         if(body.getNodeType() == JsonNodeType.STRING){
             // Если body строка, то получить значение из outputData
 //            return getValueByPath(body.asText().split("\\."), outputData, body);
-            return getValueByPath(body.asText(), outputData, body);
+            return getValueByPath(body.asText(), outputData);
         } else if (body.isObject()) {
             ObjectNode res = (ObjectNode) body;
             // Если body объект, то переберем все поля
@@ -40,7 +40,7 @@ public class TaskUtils {
                 if (field.getValue().getNodeType() == JsonNodeType.STRING)
                     // Если строка, то получить значение из outputData
 //                    field.setValue(getValueByPath(field.getValue().asText().split("\\."), outputData, field.getValue()));
-                    field.setValue(getValueByPath(field.getValue().asText(), outputData, field.getValue()));
+                    field.setValue(getValueByPath(field.getValue().asText(), outputData));
                 else if (field.getValue().isObject())
                     // Если после объект, то рекурсивный запрос
                     field.setValue(resolveOutputData(field.getValue(), outputData));
@@ -63,7 +63,7 @@ public class TaskUtils {
         return body;
     }
 
-    public JsonNode getValueByPath(String path, JsonNode outputData, JsonNode defaultValue) {
+    public JsonNode getValueByPath(String path, JsonNode outputData) {
         Matcher scriptMatcher = Pattern.compile("JS\\{(.*?)\\}JS").matcher(path);
         while (scriptMatcher.find()) {
             // Скрипт без обработки
@@ -77,7 +77,7 @@ public class TaskUtils {
                 while (valueMatcher.find()) {
                     String valuePath = rawScript.substring(valueMatcher.start() + 1, valueMatcher.end() - 1);
                     String replacePath = rawScript.substring(valueMatcher.start(), valueMatcher.end());
-                    String replaceValue = OBJECT_MAPPER.writeValueAsString(getValueByPath(valuePath.split("\\."), outputData, defaultValue));
+                    String replaceValue = OBJECT_MAPPER.writeValueAsString(getValueByPath(valuePath.split("\\."), outputData, OBJECT_MAPPER.valueToTree(valuePath)));
                     executeScript = executeScript.replace(replacePath, replaceValue);
                 }
                 Object result = jsEngine.eval(executeScript);
@@ -87,7 +87,7 @@ public class TaskUtils {
                 logException(log, e);
             }
         }
-        return getValueByPath(path.split("\\."), outputData, defaultValue);
+        return getValueByPath(path.split("\\."), outputData, OBJECT_MAPPER.valueToTree(path));
     }
 
     public JsonNode getValueByPath(String[] path, JsonNode outputData, JsonNode defaultValue) {
