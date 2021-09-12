@@ -1,3 +1,9 @@
+## 0.0.40
+
+- Add visible to ExcelCol
+- Add cellFormula to ExcelCol
+- Add merge configFields and manual field 
+
 ## 0.0.39
 
 - Fix JS template

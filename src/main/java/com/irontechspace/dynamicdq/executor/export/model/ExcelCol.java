@@ -17,16 +17,18 @@ public class ExcelCol {
     private final static String timestampFormatPattern = "yyyy-MM-dd'T'HH:mm:ssXXX";
     private final static String doubleFormatPattern = "#,##0.00000";
 
-    private String header;
-    private String name;
-    private String align;
-    private Long width;
-    private String typeData;
-    private String dataFormat;
-    private Integer colSpan;
-    private Integer rowSpan;
-    private ExcelStyle headerStyle;
-    private ExcelStyle cellStyle;
+    private Boolean visible = false;
+    private String header = "---";
+    private String name = null;
+    private String align = "left";
+    private Long width = 200L;
+    private String typeData = "text";
+    private String dataFormat = getDefaultFormat(typeData);
+    private Integer colSpan = 1;
+    private Integer rowSpan = 1;
+    private ExcelStyle headerStyle = null;
+    private ExcelStyle cellStyle = null;
+    private String cellFormula = null;
 
 
     public ExcelCol(QueryField queryField) {
@@ -40,21 +42,25 @@ public class ExcelCol {
         rowSpan = 1;
         headerStyle = null;
         cellStyle = null;
+        cellFormula = null;
     }
 
-    public ExcelCol(JsonNode jsonField) {
-        header = jsonField.path("header").isMissingNode() ? "---" : jsonField.get("header").asText();
-        name = jsonField.path("name").isMissingNode() ? null : jsonField.get("name").asText();
-        align = jsonField.path("align").isMissingNode() ? "left" : jsonField.get("align").asText();
-        width = jsonField.path("width").isMissingNode() ? 200L : jsonField.get("width").asLong();
-        typeData = jsonField.path("typeData").isMissingNode() ? "text" : jsonField.get("typeData").asText();
+    public void setExcelCol(JsonNode jsonField) {
+        visible = !jsonField.path("visible").isMissingNode() && jsonField.get("visible").asBoolean();
+        header = jsonField.path("header").isMissingNode() ? header : jsonField.get("header").asText();
+        name = jsonField.path("name").isMissingNode() ? name : jsonField.get("name").asText();
+        align = jsonField.path("align").isMissingNode() ? align : jsonField.get("align").asText();
+        width = jsonField.path("width").isMissingNode() ? width : jsonField.get("width").asLong();
+        typeData = jsonField.path("typeData").isMissingNode() ? typeData : jsonField.get("typeData").asText();
         dataFormat = jsonField.path("dataFormat").isMissingNode() ? getDefaultFormat(typeData) : jsonField.get("dataFormat").asText();
-        colSpan = jsonField.path("colSpan").isMissingNode() ? 1 : jsonField.get("colSpan").asInt();
-        rowSpan = jsonField.path("rowSpan").isMissingNode() ? 1 : jsonField.get("rowSpan").asInt();
+        colSpan = jsonField.path("colSpan").isMissingNode() ? colSpan : jsonField.get("colSpan").asInt();
+        rowSpan = jsonField.path("rowSpan").isMissingNode() ? rowSpan : jsonField.get("rowSpan").asInt();
         try {
-            headerStyle = jsonField.path("headerStyle").isMissingNode() ? null : OBJECT_MAPPER.treeToValue(jsonField.get("headerStyle"), ExcelStyle.class);
-            cellStyle = jsonField.path("cellStyle").isMissingNode() ? null : OBJECT_MAPPER.treeToValue(jsonField.get("cellStyle"), ExcelStyle.class);
+            headerStyle = jsonField.path("headerStyle").isMissingNode() ? headerStyle : OBJECT_MAPPER.treeToValue(jsonField.get("headerStyle"), ExcelStyle.class);
+            cellStyle = jsonField.path("cellStyle").isMissingNode() ? cellStyle : OBJECT_MAPPER.treeToValue(jsonField.get("cellStyle"), ExcelStyle.class);
         } catch (JsonProcessingException ignored) {}
+        cellFormula = jsonField.path("cellFormula").isMissingNode() ? cellFormula : jsonField.get("cellFormula").asText();
+
     }
 
     private String getDefaultFormat(String typeData){
@@ -66,5 +72,4 @@ public class ExcelCol {
             default: return "";
         }
     }
-
 }

@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.irontechspace.dynamicdq.configurator.query.QueryConfigService;
 import com.irontechspace.dynamicdq.configurator.query.model.QueryConfig;
-import com.irontechspace.dynamicdq.configurator.query.model.QueryField;
 import com.irontechspace.dynamicdq.executor.export.model.ExcelBorder;
 import com.irontechspace.dynamicdq.executor.export.model.ExcelCol;
 import com.irontechspace.dynamicdq.executor.export.model.ExcelFont;
@@ -27,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
@@ -71,12 +71,19 @@ public class ExportExcelService {
         List<ExcelCol> fields = new ArrayList<>();
         if(configName != null) {
             QueryConfig config = queryConfigService.getByName(configName, userId, userRoles);
-            fields = config.getFields().stream().filter(QueryField::getVisible).map(ExcelCol::new).collect(Collectors.toList());
-        } else if (body.get("fields") != null && body.get("fields").isArray()) {
-            ArrayNode fieldsArray = (ArrayNode) body.get("fields");
-            for(JsonNode jsonField : fieldsArray)
-                fields.add(new ExcelCol(jsonField));
+//            fields = config.getFields().stream().filter(QueryField::getVisible).map(ExcelCol::new).collect(Collectors.toList());
+            fields = config.getFields().stream().map(ExcelCol::new).collect(Collectors.toList());
         }
+        if (body.get("fields") != null && body.get("fields").isArray()) {
+            ArrayNode fieldsArray = (ArrayNode) body.get("fields");
+//            fields.add(new ExcelCol(jsonField));
+            for(JsonNode jsonField : fieldsArray)
+                for(ExcelCol field : fields)
+                    if(!jsonField.path("name").isMissingNode() && field.getName().equals(jsonField.get("name").asText()))
+                        field.setExcelCol(jsonField);
+        }
+
+        fields = fields.stream().filter(ExcelCol::getVisible).collect(Collectors.toList());
 
         try {
             XSSFWorkbook workbook = OBJECT_MAPPER.treeToValue(body.get("file"), XSSFWorkbook.class);
@@ -202,12 +209,27 @@ public class ExportExcelService {
     }
 
     private void setCellValue(Cell cell, ExcelCol field, JsonNode rowData){
-        if(Arrays.asList("date", "time", "timestamp").contains(field.getTypeData())) {
-            cell.setCellValue(LocalDateTime.parse(rowData.get(field.getName()).asText(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")));
-        } else if("double".equals(field.getTypeData())){
-            cell.setCellValue(rowData.get(field.getName()).asDouble());
+        if(rowData.get(field.getName()) == null || rowData.get(field.getName()).isNull() || rowData.get(field.getName()).asText().trim().equals("")){
+            cell.setCellValue("---");
+            return;
+        }
+
+        if(field.getCellFormula() != null) {
+            AtomicReference<String> formula = new AtomicReference<>(field.getCellFormula());
+            rowData.fields().forEachRemaining(rowField ->
+                formula.set(formula.get().replaceAll(rowField.getKey(), rowField.getValue().asText()))
+            );
+            cell.setCellFormula(formula.get());
         } else {
-            cell.setCellValue(rowData.get(field.getName()).asText());
+            if(Arrays.asList("date", "time", "timestamp").contains(field.getTypeData())) {
+                cell.setCellValue(LocalDateTime.parse(rowData.get(field.getName()).asText(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")));
+            } else if(Arrays.asList("int", "double").contains(field.getTypeData())){
+                cell.setCellValue(rowData.get(field.getName()).asDouble());
+            } else if("bool".equals(field.getTypeData())){
+                cell.setCellValue(rowData.get(field.getName()).asBoolean());
+            } else {
+                cell.setCellValue(rowData.get(field.getName()).asText());
+            }
         }
     }
 
@@ -251,6 +273,7 @@ public class ExportExcelService {
         String fileName = body.get("fileName").asText();
         try {
             XSSFWorkbook workbook = OBJECT_MAPPER.treeToValue(body.get("file"), XSSFWorkbook.class);
+            workbook.getCreationHelper().createFormulaEvaluator().evaluateAll();
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             workbook.write(bos);
             MultipartFile multipartFile = new MockMultipartFile(fileName, fileName, "application/vnd.ms-excel", bos.toByteArray());
