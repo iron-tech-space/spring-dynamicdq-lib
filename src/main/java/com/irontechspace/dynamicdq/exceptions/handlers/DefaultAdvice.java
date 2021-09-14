@@ -26,6 +26,8 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
+import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
+
 @Log4j2
 @ControllerAdvice
 public class DefaultAdvice
@@ -59,61 +61,62 @@ public class DefaultAdvice
             EmptyResultDataAccessException.class,
             PSQLException.class
     })
-    public ResponseEntity<Object> handleException(Exception ex) {
-        ex.printStackTrace();
+    public ResponseEntity<Object> handleException(Exception e) {
+//        ex.printStackTrace();
+        logException(log, e);
 
         /** HTTP EXCEPTION */
-        if (ex instanceof HttpRequestMethodNotSupportedException)
-            return getEntity(HttpStatus.METHOD_NOT_ALLOWED, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof HttpMediaTypeNotSupportedException)
-            return getEntity(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof HttpMediaTypeNotAcceptableException)
-            return getEntity(HttpStatus.NOT_ACCEPTABLE, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof MissingPathVariableException)
-            return getEntity(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof MissingServletRequestParameterException)
-            return getEntity(HttpStatus.BAD_REQUEST, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof ServletRequestBindingException)
-            return getEntity(HttpStatus.BAD_REQUEST, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof ConversionNotSupportedException)
-            return getEntity(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof TypeMismatchException)
-            return getEntity(HttpStatus.BAD_REQUEST, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof HttpMessageNotReadableException)
-            return getEntity(HttpStatus.BAD_REQUEST, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof HttpMessageNotWritableException)
-            return getEntity(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof MethodArgumentNotValidException)
-            return getEntity(HttpStatus.BAD_REQUEST, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof MissingServletRequestPartException)
-            return getEntity(HttpStatus.BAD_REQUEST, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof BindException)
-            return getEntity(HttpStatus.BAD_REQUEST, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof NoHandlerFoundException)
-            return getEntity(HttpStatus.NOT_FOUND, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof AsyncRequestTimeoutException)
-            return getEntity(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof ResponseStatusException)
-            return getEntity(((ResponseStatusException) ex).getStatus(), ((ResponseStatusException) ex).getReason(), ex.getStackTrace());
+        if (e instanceof HttpRequestMethodNotSupportedException)
+            return getEntity(HttpStatus.METHOD_NOT_ALLOWED, e.getMessage(), e.getStackTrace());
+        else if (e instanceof HttpMediaTypeNotSupportedException)
+            return getEntity(HttpStatus.UNSUPPORTED_MEDIA_TYPE, e.getMessage(), e.getStackTrace());
+        else if (e instanceof HttpMediaTypeNotAcceptableException)
+            return getEntity(HttpStatus.NOT_ACCEPTABLE, e.getMessage(), e.getStackTrace());
+        else if (e instanceof MissingPathVariableException)
+            return getEntity(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e.getStackTrace());
+        else if (e instanceof MissingServletRequestParameterException)
+            return getEntity(HttpStatus.BAD_REQUEST, e.getMessage(), e.getStackTrace());
+        else if (e instanceof ServletRequestBindingException)
+            return getEntity(HttpStatus.BAD_REQUEST, e.getMessage(), e.getStackTrace());
+        else if (e instanceof ConversionNotSupportedException)
+            return getEntity(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e.getStackTrace());
+        else if (e instanceof TypeMismatchException)
+            return getEntity(HttpStatus.BAD_REQUEST, e.getMessage(), e.getStackTrace());
+        else if (e instanceof HttpMessageNotReadableException)
+            return getEntity(HttpStatus.BAD_REQUEST, e.getMessage(), e.getStackTrace());
+        else if (e instanceof HttpMessageNotWritableException)
+            return getEntity(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e.getStackTrace());
+        else if (e instanceof MethodArgumentNotValidException)
+            return getEntity(HttpStatus.BAD_REQUEST, e.getMessage(), e.getStackTrace());
+        else if (e instanceof MissingServletRequestPartException)
+            return getEntity(HttpStatus.BAD_REQUEST, e.getMessage(), e.getStackTrace());
+        else if (e instanceof BindException)
+            return getEntity(HttpStatus.BAD_REQUEST, e.getMessage(), e.getStackTrace());
+        else if (e instanceof NoHandlerFoundException)
+            return getEntity(HttpStatus.NOT_FOUND, e.getMessage(), e.getStackTrace());
+        else if (e instanceof AsyncRequestTimeoutException)
+            return getEntity(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage(), e.getStackTrace());
+        else if (e instanceof ResponseStatusException)
+            return getEntity(((ResponseStatusException) e).getStatus(), ((ResponseStatusException) e).getReason(), e.getStackTrace());
 
 
         /** DYNAMICDQ EXCEPTION */
-        else if (ex instanceof IllegalArgumentException)
-            return getEntity(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof NullPointerException)
-            return getEntity(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof NotFoundException)
-            return getEntity(HttpStatus.NOT_FOUND, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof ForbiddenException)
-            return getEntity(HttpStatus.FORBIDDEN, ex.getMessage(), ex.getStackTrace());
+        else if (e instanceof IllegalArgumentException)
+            return getEntity(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e.getStackTrace());
+        else if (e instanceof NullPointerException)
+            return getEntity(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e.getStackTrace());
+        else if (e instanceof NotFoundException)
+            return getEntity(HttpStatus.NOT_FOUND, e.getMessage(), e.getStackTrace());
+        else if (e instanceof ForbiddenException)
+            return getEntity(HttpStatus.FORBIDDEN, e.getMessage(), e.getStackTrace());
 
         /** DB EXCEPTION */
-        else if (ex instanceof EmptyResultDataAccessException)
-            return getEntity(HttpStatus.NOT_FOUND, ex.getMessage(), ex.getStackTrace());
-        else if (ex instanceof PSQLException)
-            return getEntity(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), ex.getStackTrace());
+        else if (e instanceof EmptyResultDataAccessException)
+            return getEntity(HttpStatus.NOT_FOUND, e.getMessage(), e.getStackTrace());
+        else if (e instanceof PSQLException)
+            return getEntity(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e.getStackTrace());
         else
-            return getEntity(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), ex.getStackTrace());
+            return getEntity(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e.getStackTrace());
     }
 
     private ResponseEntity<Object> getEntity (HttpStatus status, String message, StackTraceElement[] error) {

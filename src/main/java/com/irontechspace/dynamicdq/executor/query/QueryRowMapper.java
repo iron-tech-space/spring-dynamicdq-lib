@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
+
 @Log4j2
 public class QueryRowMapper implements RowMapper<ObjectNode> {
 
@@ -49,7 +51,8 @@ public class QueryRowMapper implements RowMapper<ObjectNode> {
                             else
                                 rowObject.put(fieldName, OBJECT_MAPPER.nullNode());
                         } catch (JsonProcessingException e) {
-                            e.printStackTrace();
+//                            e.printStackTrace();
+                            logException(log, e);
                             rowObject.put(fieldName, OBJECT_MAPPER.nullNode());
                         }
                         break;

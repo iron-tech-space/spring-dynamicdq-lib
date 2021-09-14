@@ -20,6 +20,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
+import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
+
 @Log4j2
 public class ConfigRepository {
 
@@ -71,8 +73,9 @@ public class ConfigRepository {
             params.addValue("configType", configType);
             params.addValue( "columnData", OBJECT_MAPPER.writeValueAsString(queryConfig));
             jdbcTemplate.queryForObject(INSERT_HISTORY, params, UUID.class);
-        } catch (JsonProcessingException ex) {
-            ex.printStackTrace();
+        } catch (JsonProcessingException e) {
+//            ex.printStackTrace();
+            logException(log, e);
         }
     }
 

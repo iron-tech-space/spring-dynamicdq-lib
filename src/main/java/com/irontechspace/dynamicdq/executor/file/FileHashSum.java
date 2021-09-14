@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
+
 @Log4j2
 @Component
 public class FileHashSum {
@@ -24,7 +26,8 @@ public class FileHashSum {
         try {
             messageDigest = MessageDigest.getInstance(MD5_ALGORITHM);
         } catch (NoSuchAlgorithmException e) {
-            log.error("Error while counting file", e);
+            logException(log, e);
+//            log.error("Error while counting file", e);
         }
     }
 

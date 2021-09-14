@@ -3,7 +3,7 @@ buildscript {
 		springBootVersion = '2.2.6.RELEASE'
 		postgresqlVersion = '42.2.12'
 
-		appVersion = "0.0.37"
+		appVersion = "0.0.38"
 	}
 	repositories {
 		mavenCentral()
@@ -30,13 +30,15 @@ repositories {
 
 dependencies {
 	compile("org.projectlombok:lombok")
+	compile("org.apache.poi:poi-ooxml:5.0.0")
 	compile("org.aspectj:aspectjtools:1.9.5")
 	compile("org.springframework.boot:spring-boot-starter-web:${springBootVersion}")
 	compile("org.springframework.boot:spring-boot-starter-amqp:${springBootVersion}")
-	compile("org.springframework.boot:spring-boot-starter-activemq:${springBootVersion}")
 	compile("org.springframework.boot:spring-boot-starter-data-jdbc:${springBootVersion}")
 	compile("org.springframework.security:spring-security-crypto")
 	compile("org.postgresql:postgresql:${postgresqlVersion}")
+
+	compile("org.springframework.boot:spring-boot-starter-test:${springBootVersion}")
 }
 
 compileJava {

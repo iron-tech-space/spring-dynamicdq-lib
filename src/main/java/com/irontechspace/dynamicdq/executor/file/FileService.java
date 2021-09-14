@@ -6,8 +6,6 @@ import com.irontechspace.dynamicdq.executor.query.QueryService;
 import com.irontechspace.dynamicdq.executor.save.SaveService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.primitives.Bytes;
-import com.google.common.primitives.Longs;
 import lombok.extern.log4j.Log4j2;
 import lombok.val;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.yaml.snakeyaml.util.UriEncoder;
 
 import java.io.*;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -32,6 +31,8 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+
+import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
 
 @Log4j2
 @Service
@@ -147,7 +148,7 @@ public class FileService {
      * @param dataObject - дополнительные данные по файлу
      * @return - результат сохранения (throw или id файла в БД)
      */
-    public ResponseEntity<Object> saveFile(String configName, UUID userId, List<String> userRoles, MultipartFile file, JsonNode dataObject) {
+    public Object saveFile(String configName, UUID userId, List<String> userRoles, MultipartFile file, JsonNode dataObject) {
 
         saveConfigService.getByName(configName, userId, userRoles);
 
@@ -156,10 +157,21 @@ public class FileService {
         catch (IOException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Не удалось загрузить файл. Файл поврежден", ex); }
 
-        String originalName = file.getOriginalFilename();
+        String originalName = Optional.ofNullable(file.getOriginalFilename()).orElse("");
 
         long time = new Date().toInstant().toEpochMilli();
-        byte[] hashData = Bytes.concat(Longs.toByteArray(time), originalName.getBytes(), content);
+//        Long.valueOf(time)
+
+        byte[] hashData;
+        try {
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream( );
+            outputStream.write( ByteBuffer.allocate(Long.BYTES).putLong(time).array() );
+            outputStream.write( originalName.getBytes() );
+            outputStream.write( content );
+            hashData = outputStream.toByteArray();
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Не удалось загрузить файл. Ошибка расчета хэш суммы файла", ex); }
+//        byte[] hashData = Bytes.concat(Longs.toByteArray(time), originalName.getBytes(), content);
 
         String fileHash = fileHashSum.getHashSum(hashData);
 
@@ -199,8 +211,9 @@ public class FileService {
         catch (IOException ex) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Не удалось загрузить файл. Ошибка записи файла на файловую систему", ex); }
 
-        Object key = saveService.saveData(configName, userId, userRoles, fileData);
-        return ResponseEntity.ok().body(key);
+//        Object key = saveService.saveData(configName, userId, userRoles, fileData);
+//        return ResponseEntity.ok().body(key);
+        return saveService.saveData(configName, userId, userRoles, fileData);
     }
 
     /**
@@ -268,9 +281,6 @@ public class FileService {
     private void saveFileIntoStorageDirectory(String absolutePath, byte[] content) throws IOException {
         try (FileOutputStream fileStream = new FileOutputStream(absolutePath)) {
             fileStream.write(content);
-        } catch (IOException e) {
-            log.error(String.format("File %s not saved", absolutePath), e);
-            throw e;
         }
     }
 

@@ -1,3 +1,18 @@
+## 0.0.38
+
+- Add log http request
+- Fix def task body and Fix set output
+- Add read write array
+- Add execute JS code
+- Add props to `addTableExcel` operation 
+  - hiddenHeader 
+  - headerHeight 
+  - rowHeight 
+  - dateFormat
+- Remove ActiveMQ
+- Fix log exception
+- Add excel style
+
 ## 0.0.37
 
 - Refactor struct project

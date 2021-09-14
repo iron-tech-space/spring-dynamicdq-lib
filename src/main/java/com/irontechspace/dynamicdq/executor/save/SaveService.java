@@ -23,6 +23,7 @@ import javax.sql.DataSource;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
 import static com.irontechspace.dynamicdq.utils.SqlUtils.*;
 
 @Log4j2
@@ -57,7 +58,8 @@ public class SaveService {
             result = dataObject;
             ((ObjectNode) result).set(saveLogic.getPrimaryKey(), OBJECT_MAPPER.valueToTree(pk));
         } catch (JsonProcessingException e){
-            e.printStackTrace();
+//            e.printStackTrace();
+            logException(log, e);
         }
         return result;
     }
