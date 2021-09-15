@@ -1,3 +1,7 @@
+## 0.0.39
+
+- Fix JS template
+
 ## 0.0.38
 
 - Add log http request

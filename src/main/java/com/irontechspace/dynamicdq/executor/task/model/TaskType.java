@@ -22,6 +22,6 @@ public enum TaskType {
     event,
     createExcel,
     addTableExcel,
-    addRowExcel,
-    saveExcel
+    saveExcel,
+    saveVar
 }

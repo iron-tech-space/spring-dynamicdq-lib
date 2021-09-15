@@ -131,8 +131,8 @@ public class TaskService {
             case event: return executeEvent(userId, body);
             case createExcel: return exportExcelService.createExcel(body);
             case addTableExcel: return exportExcelService.addTableExcel(configName, userId, userRoles, body);
-            case addRowExcel: return exportExcelService.addRowExcel(body);
             case saveExcel: return exportExcelService.saveExcel(configName, userId, userRoles, body);
+            case saveVar: return body;
             default:
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ошибка запроса. Указан не существующий execute type");
         }
