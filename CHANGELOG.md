@@ -2,6 +2,7 @@
 
 - Add exit by exception from task
 - Add `resolveOutputData` for events in task
+- Add `taskVars` with general task info
 - Refactor exception handler
 - Refactor file service log
 
