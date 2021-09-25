@@ -142,7 +142,7 @@ public class QueryService {
     }
 
     /** Перегрузка метода получения данных */
-    private List<ObjectNode> getQueryData(DataSource dateSource, QueryConfig queryConfig, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
+    public List<ObjectNode> getQueryData(DataSource dateSource, QueryConfig queryConfig, UUID userId, List<String> userRoles, JsonNode filter, Pageable pageable){
         return getQueryData(dateSource, queryConfig, userId, userRoles, filter, pageable, TypeQuery.TABLE);
     }
 
