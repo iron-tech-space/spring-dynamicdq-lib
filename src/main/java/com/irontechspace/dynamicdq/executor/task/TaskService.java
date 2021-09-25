@@ -16,12 +16,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
-import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException;
+import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.*;
 
 @Log4j2
 @Service
@@ -59,7 +57,9 @@ public class TaskService {
 
             // Init config params
             TaskConfig config = task.getConfigs().get(i);
-            TaskConfigEvents events = config.getEvents();
+//            TaskConfigEvents events = config.getEvents();
+            JsonNode events = config.getEvents() != null && !config.getEvents().isNull()
+                    ? taskUtils.resolveOutputData(config.getEvents(), outputData) : null;
 
             try {
                 // Init body and pageable
@@ -67,26 +67,30 @@ public class TaskService {
                 Pageable pageable = taskUtils.jsonToPageable(config.getPageable());
 
                 // START Event
-                if (events != null) executeEvent("start", task.getUserId(), events.getStart(), body);
-                log.info("Execute task type: [{}]", config.getTypeExecutor());
+                if (events != null && !events.path("start").isMissingNode())
+                    executeEvent("start", config.getTypeExecutor().toString(), task.getUserId(), events.get("start"), body);
 
                 // Любой конфиг кроме выходного (branch пока исключен совсем)
                 if (config.getTypeExecutor() != TaskType.output) {
+                    log.info("Execute operation type: [{}]", config.getTypeExecutor());
                     Object res = executeConfig(config.getTypeExecutor(), config.getConfigName(), task.getUserId(), task.getUserRoles(), body, pageable);
                     if (config.getOutput() != null)
                         taskUtils.setOutputData(config.getTypeExecutor(), config.getOutput().split("\\."), outputData, res);
                 }
 
                 // FINISH Event
-                if (events != null) executeEvent("finish", task.getUserId(), events.getFinish(), body);
+                if (events != null && !events.path("finish").isMissingNode())
+                    executeEvent("finish", config.getTypeExecutor().toString(), task.getUserId(), events.get("finish"), body);
 
                 // Выходной конфиг
                 if (config.getTypeExecutor() == TaskType.output)
                     return body;
             } catch (Exception e) {
                 logException(log, e);
-                if (events != null)
-                    executeEvent("error", task.getUserId(), events.getError(), OBJECT_MAPPER.createObjectNode().put("error", e.getMessage()));
+                if (events != null && !events.path("error").isMissingNode())
+                    executeEvent("error", config.getTypeExecutor().toString(), task.getUserId(), events.get("error"),
+                            OBJECT_MAPPER.createObjectNode().put("error", e.getMessage()).put("error_description", getStackTrace(e)));
+                return getExceptionEntity(HttpStatus.INTERNAL_SERVER_ERROR, e);
             }
         }
         return null;
@@ -141,6 +145,13 @@ public class TaskService {
     private Object executeEvent(String type, UUID userId, TaskConfigEvent event, JsonNode data){
         if(event != null)
             log.info("Push {} event: {}", type, systemEventsService.pushEvent(userId, event.getId(), event.getDataTemplate(), data));
+        return null;
+    }
+
+    private Object executeEvent(String type, String typeExecutor, UUID userId, JsonNode eventBody, JsonNode configBody){
+        if(eventBody != null)
+            log.info("Push {} event for [{}]: {}", type, typeExecutor,
+                    systemEventsService.pushEvent(userId, UUID.fromString(eventBody.get("id").asText()), eventBody.get("dataTemplate"), configBody));
         return null;
     }
 

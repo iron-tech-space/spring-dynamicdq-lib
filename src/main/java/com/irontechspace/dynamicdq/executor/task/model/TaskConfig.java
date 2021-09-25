@@ -22,5 +22,6 @@ public class TaskConfig {
 
     private String output;
 
-    private TaskConfigEvents events;
+//    private TaskConfigEvents events;
+    private JsonNode events;
 }
