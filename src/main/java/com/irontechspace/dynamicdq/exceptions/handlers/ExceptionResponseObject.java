@@ -27,6 +27,6 @@ public class ExceptionResponseObject
     /**
      * Описание ошибки
      */
-    private StackTraceElement[] error_description;
+    private String error_description;
 }
 

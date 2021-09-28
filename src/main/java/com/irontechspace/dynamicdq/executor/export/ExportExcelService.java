@@ -69,7 +69,7 @@ public class ExportExcelService {
     public JsonNode addTableExcel(String configName, UUID userId, List<String> userRoles, JsonNode body) {
 
         List<ExcelCol> fields = new ArrayList<>();
-        if(configName != null) {
+        if (configName != null) {
             QueryConfig config = queryConfigService.getByName(configName, userId, userRoles);
 //            fields = config.getFields().stream().filter(QueryField::getVisible).map(ExcelCol::new).collect(Collectors.toList());
             fields = config.getFields().stream().map(ExcelCol::new).collect(Collectors.toList());
@@ -77,82 +77,83 @@ public class ExportExcelService {
         if (body.get("fields") != null && body.get("fields").isArray()) {
             ArrayNode fieldsArray = (ArrayNode) body.get("fields");
 //            fields.add(new ExcelCol(jsonField));
-            for(JsonNode jsonField : fieldsArray)
-                for(ExcelCol field : fields)
-                    if(!jsonField.path("name").isMissingNode() && field.getName().equals(jsonField.get("name").asText()))
+            for (JsonNode jsonField : fieldsArray)
+                for (ExcelCol field : fields)
+                    if (!jsonField.path("name").isMissingNode() && field.getName().equals(jsonField.get("name").asText()))
                         field.setExcelCol(jsonField);
         }
 
         fields = fields.stream().filter(ExcelCol::getVisible).collect(Collectors.toList());
 
+        XSSFWorkbook workbook = null;
         try {
-            XSSFWorkbook workbook = OBJECT_MAPPER.treeToValue(body.get("file"), XSSFWorkbook.class);
-            Sheet sheet = workbook.getSheet(body.get("sheet").asText());
-            CellRangeAddress region;
-            ArrayNode data = (ArrayNode) body.get("data");
-            boolean hiddenHeader = !body.path("hiddenHeader").isMissingNode() && body.get("hiddenHeader").asBoolean();
-            float headerHeight = body.path("headerHeight").isMissingNode() ? -1 : body.get("headerHeight").floatValue();
-            float rowHeight = body.path("rowHeight").isMissingNode() ? -1 : body.get("rowHeight").floatValue();
-            int startRowIndex = body.get("startCell").get("row").asInt();
-            int startColIndex = body.get("startCell").get("col").asInt();
-
-            if(hiddenHeader) {
-                for (int colIndex = startColIndex; colIndex < fields.size(); colIndex++) {
-                    sheet.setColumnWidth(colIndex, pixel2WidthUnits(fields.get(colIndex).getWidth().intValue()));
-                }
-            } else {
-                Row headers = Optional.ofNullable(sheet.getRow(startRowIndex)).orElse(sheet.createRow(startRowIndex));
-                headers.setHeightInPoints(headerHeight);
-                Integer maxRowSpan = 1;
-                for (int fIdx = startColIndex, colIdx = startColIndex;  fIdx < fields.size(); fIdx++) {
-                    ExcelCol field = fields.get(fIdx);
-                    Cell cell = headers.createCell(colIdx);
-                    cell.setCellStyle(getHeaderStyle(workbook, field));
-                    cell.setCellValue(field.getHeader());
-
-                    sheet.setColumnWidth(colIdx, pixel2WidthUnits(field.getWidth().intValue()));
-                    if(field.getColSpan() > 1 || field.getRowSpan() > 1) {
-                        region = new CellRangeAddress(startRowIndex, startRowIndex + field.getRowSpan() - 1, colIdx, colIdx + field.getColSpan() - 1);
-                        sheet.addMergedRegion(region);
-                        maxRowSpan = field.getRowSpan() > maxRowSpan ? field.getRowSpan() : maxRowSpan;
-                    } else {
-                        region = new CellRangeAddress(startRowIndex, startRowIndex, colIdx, colIdx);
-                    }
-                    if(field.getHeaderStyle() != null)
-                        setBorders(field.getHeaderStyle().getBorder(), region, sheet);
-                    colIdx += field.getColSpan();
-                }
-                startRowIndex += maxRowSpan;
-            }
-
-            for (int dataIndex = 0, rowIndex = startRowIndex; dataIndex < data.size(); dataIndex++, rowIndex++) {
-                JsonNode rowData = data.get(dataIndex);
-                Row row = Optional.ofNullable(sheet.getRow(rowIndex)).orElse(sheet.createRow(startRowIndex + dataIndex));
-                row.setHeightInPoints(rowHeight);
-                for (int fIdx = startColIndex, colIdx = startColIndex; fIdx < fields.size(); fIdx++) {
-                    ExcelCol field = fields.get(fIdx);
-                    Cell cell = row.createCell(colIdx);
-                    cell.setCellStyle(getCellStyle(workbook, field));
-                    setCellValue(cell, field, rowData);
-
-                    if(field.getColSpan() > 1) {
-                        region = new CellRangeAddress(rowIndex, rowIndex, colIdx, colIdx + field.getColSpan() - 1);
-                        sheet.addMergedRegion(region);
-                    } else {
-                        region = new CellRangeAddress(rowIndex, rowIndex, colIdx, colIdx);
-                    }
-                    if(field.getCellStyle() != null)
-                        setBorders(field.getCellStyle().getBorder(), region, sheet);
-                    colIdx += field.getColSpan();
-                }
-            }
-
-            return OBJECT_MAPPER.createObjectNode().put("rowIndex", startRowIndex + data.size()).put("colIndex", startColIndex + fields.size());
+            workbook = OBJECT_MAPPER.treeToValue(body.get("file"), XSSFWorkbook.class);
         } catch (IOException e) {
-//            e.printStackTrace();
             logException(log, e);
             return OBJECT_MAPPER.nullNode();
         }
+        Sheet sheet = workbook.getSheet(body.get("sheet").asText());
+        CellRangeAddress region;
+        ArrayNode data = (ArrayNode) body.get("data");
+        boolean hiddenHeader = !body.path("hiddenHeader").isMissingNode() && body.get("hiddenHeader").asBoolean();
+        float headerHeight = body.path("headerHeight").isMissingNode() ? -1 : body.get("headerHeight").floatValue();
+        float rowHeight = body.path("rowHeight").isMissingNode() ? -1 : body.get("rowHeight").floatValue();
+//        int startRowIndex = body.get("startCell").get("row").asInt();
+//        int startColIndex = body.get("startCell").get("col").asInt();
+        int startRowIndex = Objects.requireNonNull(Objects.requireNonNull(body.get("startCell"), "Не заполнено startCell").get("row"), "Не заполнено startCell.row").asInt();
+        int startColIndex = Objects.requireNonNull(Objects.requireNonNull(body.get("startCell"), "Не заполнено startCell").get("col"), "Не заполнено startCell.col").asInt();
+
+        if (hiddenHeader) {
+            for (int colIndex = startColIndex; colIndex < fields.size(); colIndex++) {
+                sheet.setColumnWidth(colIndex, pixel2WidthUnits(fields.get(colIndex).getWidth().intValue()));
+            }
+        } else {
+            Row headers = Optional.ofNullable(sheet.getRow(startRowIndex)).orElse(sheet.createRow(startRowIndex));
+            headers.setHeightInPoints(headerHeight);
+            Integer maxRowSpan = 1;
+            for (int fIdx = startColIndex, colIdx = startColIndex; fIdx < fields.size(); fIdx++) {
+                ExcelCol field = fields.get(fIdx);
+                Cell cell = headers.createCell(colIdx);
+                cell.setCellStyle(getHeaderStyle(workbook, field));
+                cell.setCellValue(field.getHeader());
+
+                sheet.setColumnWidth(colIdx, pixel2WidthUnits(field.getWidth().intValue()));
+                if (field.getColSpan() > 1 || field.getRowSpan() > 1) {
+                    region = new CellRangeAddress(startRowIndex, startRowIndex + field.getRowSpan() - 1, colIdx, colIdx + field.getColSpan() - 1);
+                    sheet.addMergedRegion(region);
+                    maxRowSpan = field.getRowSpan() > maxRowSpan ? field.getRowSpan() : maxRowSpan;
+                } else {
+                    region = new CellRangeAddress(startRowIndex, startRowIndex, colIdx, colIdx);
+                }
+                if (field.getHeaderStyle() != null)
+                    setBorders(field.getHeaderStyle().getBorder(), region, sheet);
+                colIdx += field.getColSpan();
+            }
+            startRowIndex += maxRowSpan;
+        }
+
+        for (int dataIndex = 0, rowIndex = startRowIndex; dataIndex < data.size(); dataIndex++, rowIndex++) {
+            JsonNode rowData = data.get(dataIndex);
+            Row row = Optional.ofNullable(sheet.getRow(rowIndex)).orElse(sheet.createRow(startRowIndex + dataIndex));
+            row.setHeightInPoints(rowHeight);
+            for (int fIdx = startColIndex, colIdx = startColIndex; fIdx < fields.size(); fIdx++) {
+                ExcelCol field = fields.get(fIdx);
+                Cell cell = row.createCell(colIdx);
+                cell.setCellStyle(getCellStyle(workbook, field));
+                setCellValue(cell, field, rowData);
+
+                if (field.getColSpan() > 1) {
+                    region = new CellRangeAddress(rowIndex, rowIndex, colIdx, colIdx + field.getColSpan() - 1);
+                    sheet.addMergedRegion(region);
+                } else {
+                    region = new CellRangeAddress(rowIndex, rowIndex, colIdx, colIdx);
+                }
+                if (field.getCellStyle() != null)
+                    setBorders(field.getCellStyle().getBorder(), region, sheet);
+                colIdx += field.getColSpan();
+            }
+        }
+        return OBJECT_MAPPER.createObjectNode().put("rowIndex", startRowIndex + data.size()).put("colIndex", startColIndex + fields.size());
     }
 
     private XSSFFont getFont(XSSFWorkbook workbook, ExcelFont excelFont) {

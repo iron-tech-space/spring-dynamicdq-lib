@@ -1,3 +1,10 @@
+## 0.0.41
+
+- Add exit by exception from task
+- Add `resolveOutputData` for events in task
+- Refactor exception handler
+- Refactor file service log
+
 ## 0.0.40
 
 - Add visible to ExcelCol

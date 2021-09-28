@@ -178,18 +178,18 @@ public class FileService {
         Path directoryPath;
         String fileAbsolutePath;
         String fileRelativePath;
-
+        String dateFolder = getDate();
 
         if(dataObject.has("saveDir") && !dataObject.get("saveDir").isNull()) {
-            directoryPath = Paths.get(rootDir, dataObject.get("saveDir").asText(), getDate());
+            directoryPath = Paths.get(rootDir, dataObject.get("saveDir").asText(), dateFolder);
 
-            fileRelativePath = Paths.get(dataObject.get("saveDir").asText(), getDate(), fileHash).toString();
+            fileRelativePath = Paths.get(dataObject.get("saveDir").asText(), dateFolder, fileHash).toString();
             fileAbsolutePath = Paths.get(rootDir, fileRelativePath).toAbsolutePath().toString();
 
         } else {
-            directoryPath = Paths.get(rootDir, getDate());
+            directoryPath = Paths.get(rootDir, dateFolder);
 
-            fileRelativePath = Paths.get(getDate(), fileHash).toString();
+            fileRelativePath = Paths.get(dateFolder, fileHash).toString();
             fileAbsolutePath = Paths.get(rootDir, fileRelativePath).toAbsolutePath().toString();
         }
 
@@ -289,9 +289,9 @@ public class FileService {
      * @return - строка с датой в формате YYYY-MM-DD
      */
     private String getDate () {
-        SimpleDateFormat formatter= new SimpleDateFormat("yyyy-MM-dd");
-        Date date = new Date();
-        log.info("Date folder            = [{}]", date.toString());
-        return formatter.format(date);
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+        String date = formatter.format(new Date());
+        log.info("Date folder: [{}]", date);
+        return date;
     }
 }
