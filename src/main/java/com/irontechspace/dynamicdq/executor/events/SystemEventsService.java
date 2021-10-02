@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.node.JsonNodeType;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import javax.sql.DataSource;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -33,6 +35,10 @@ public class SystemEventsService {
     }
 
     public String pushEvent(UUID userId, UUID typeId, JsonNode dataTemplate, JsonNode data) {
+        return pushEvent(null, userId, typeId, dataTemplate, data);
+
+    }
+    public String pushEvent(DataSource ds, UUID userId, UUID typeId, JsonNode dataTemplate, JsonNode data) {
         SystemEventType type = eventTypes.stream().filter(et -> et.getId().equals(typeId)).findFirst().orElse(null);
         if(type != null){
             Map<String, String> templateValues = new HashMap<>();
@@ -53,7 +59,8 @@ public class SystemEventsService {
                     textEvent = textEvent.replaceAll(":" + key, templateValues.get(key));
             }
 //            log.info("Push event textEvent: [{}]", textEvent);
-            systemEventsRepository.insert(userId, typeId, textEvent);
+            if(ds == null) systemEventsRepository.insert(userId, typeId, textEvent);
+            else systemEventsRepository.insert(new NamedParameterJdbcTemplate(ds), userId, typeId, textEvent);
             return textEvent;
         }
         return null;

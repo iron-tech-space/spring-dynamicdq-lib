@@ -1,3 +1,7 @@
+## 0.0.42
+
+- Fix write SystemEvents to some DB
+
 ## 0.0.41
 
 - Add exit by exception from task

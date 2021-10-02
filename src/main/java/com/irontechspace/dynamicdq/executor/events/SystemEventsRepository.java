@@ -29,6 +29,9 @@ public class SystemEventsRepository {
     }
 
     public UUID insert(UUID userId, UUID typeId, String data){
+        return insert(jdbcTemplate, userId, typeId, data);
+    }
+    public UUID insert(NamedParameterJdbcTemplate jdbcTemplate, UUID userId, UUID typeId, String data){
         MapSqlParameterSource params = new MapSqlParameterSource();
         params.addValue("userId", userId);
         params.addValue("typeId", typeId);
