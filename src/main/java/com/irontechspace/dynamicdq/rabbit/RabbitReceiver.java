@@ -15,7 +15,7 @@ import static com.irontechspace.dynamicdq.exceptions.ExceptionUtils.logException
 public class RabbitReceiver {
 
     @Autowired
-    TaskService taskService;
+    private TaskService taskService;
 
     public RabbitReceiver() {
     }

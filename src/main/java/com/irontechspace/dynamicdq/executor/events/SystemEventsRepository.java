@@ -22,7 +22,7 @@ public class SystemEventsRepository {
     private static final RowMapper<SystemEventType> ROW_MAPPER_SYSTEM_EVENT_TYPE = BeanPropertyRowMapper.newInstance(SystemEventType.class);
 
     @Autowired
-    public NamedParameterJdbcTemplate jdbcTemplate;
+    private NamedParameterJdbcTemplate jdbcTemplate;
 
     public List<SystemEventType> getAll(){
         return jdbcTemplate.query(SELECT_SYSTEM_EVENT_TYPES, new HashMap<>(), ROW_MAPPER_SYSTEM_EVENT_TYPE);

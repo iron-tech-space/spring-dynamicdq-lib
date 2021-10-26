@@ -21,7 +21,7 @@ public class SystemEventsService {
     public Boolean cachingConfigs;
 
     @Autowired
-    SystemEventsRepository systemEventsRepository;
+    private SystemEventsRepository systemEventsRepository;
 
     private List<SystemEventType> eventTypes;
 
