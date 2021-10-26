@@ -45,11 +45,11 @@ public class QueryService {
     private static final String SQL_ROW_NUMBER = " row_number() over() + :offset as row_number, ";
 
     @Autowired
-    QueryConfigService queryConfigService;
+    private QueryConfigService queryConfigService;
     @Autowired
-    QueryRepository queryRepository;
+    private QueryRepository queryRepository;
     @Autowired
-    TypeConverter typeConverter;
+    private TypeConverter typeConverter;
 
 
     /** Получение SQL */

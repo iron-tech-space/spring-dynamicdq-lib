@@ -33,7 +33,7 @@ public class ConfigService<T extends Config> {
     public Boolean cachingConfigs;
 
     @Autowired
-    public SaveService saveService;
+    private SaveService saveService;
 
     public SaveLogic saveConfig;
 

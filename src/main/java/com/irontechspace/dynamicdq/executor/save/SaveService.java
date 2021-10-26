@@ -33,13 +33,13 @@ public class SaveService {
     private final static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Autowired
-    SaveConfigService saveConfigService;
+    private SaveConfigService saveConfigService;
 
     @Autowired
-    QueryRepository queryRepository;
+    private QueryRepository queryRepository;
 
     @Autowired
-    TypeConverter typeConverter;
+    private TypeConverter typeConverter;
 
     @Transactional
     public Object saveData(String configName, UUID userId, List<String> userRoles, JsonNode dataObject) {

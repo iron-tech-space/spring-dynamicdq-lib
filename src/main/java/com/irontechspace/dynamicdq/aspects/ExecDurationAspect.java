@@ -17,7 +17,7 @@ import javax.servlet.http.HttpServletRequest;
 public class ExecDurationAspect {
 
     @Autowired
-    ExecDurationRepository execDurationRepository;
+    private ExecDurationRepository execDurationRepository;
 
     @Around("@annotation(com.irontechspace.dynamicdq.annotations.ExecDuration)")
     public Object handle(ProceedingJoinPoint joinPoint) throws Throwable {

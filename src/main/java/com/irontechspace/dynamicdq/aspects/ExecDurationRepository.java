@@ -26,7 +26,7 @@ public class ExecDurationRepository {
     private final static String INSERT_HTTP_REQUESTS = "insert into dynamicdq.log_http_requests (data) values (:data) returning id;";
 
     @Autowired
-    public NamedParameterJdbcTemplate jdbcTemplate;
+    private NamedParameterJdbcTemplate jdbcTemplate;
 
     @Async("AsyncExecDuration")
     public void logExecDuration(ProceedingJoinPoint joinPoint, HttpServletRequest request, long[] duration) {

@@ -43,16 +43,16 @@ public class FileService {
     String rootDir;
 
     @Autowired
-    FileHashSum fileHashSum;
+    private FileHashSum fileHashSum;
 
     @Autowired
-    QueryService queryService;
+    private QueryService queryService;
 
     @Autowired
-    SaveConfigService saveConfigService;
+    private SaveConfigService saveConfigService;
 
     @Autowired
-    SaveService saveService;
+    private SaveService saveService;
 
     /** Получить Response с файлом */
     public ResponseEntity<Resource> getFileResponse(String configName, UUID userId, List<String> userRoles, JsonNode filter){

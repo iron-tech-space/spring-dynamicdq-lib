@@ -30,25 +30,25 @@ public class TaskService {
     private final static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Autowired
-    QueryService queryService;
+    private QueryService queryService;
 
     @Autowired
-    SaveService saveService;
+    private SaveService saveService;
 
     @Autowired
-    RabbitSender rabbitSender;
+    private RabbitSender rabbitSender;
 
     @Autowired
-    SimpleTaskConfigs simpleTaskConfigs;
+    private SimpleTaskConfigs simpleTaskConfigs;
 
     @Autowired
-    TaskUtils taskUtils;
+    private TaskUtils taskUtils;
 
     @Autowired
-    SystemEventsService systemEventsService;
+    private SystemEventsService systemEventsService;
 
     @Autowired
-    ExportExcelService exportExcelService;
+    private ExportExcelService exportExcelService;
 
     public Object executeTask(Task task) {
 

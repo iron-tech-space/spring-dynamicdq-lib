@@ -22,7 +22,7 @@ public class QueryRepository {
     private final static RowMapper<ObjectNode> OBJECT_NODE_ROW_MAPPER = new ObjectNodeRowMapper();
 
     @Autowired
-    NamedParameterJdbcTemplate jdbcTemplate;
+    private NamedParameterJdbcTemplate jdbcTemplate;
 
     public <T> List<T> selectTable(String sql, Map<String, Object> params, Class<T> clazz){
         return selectTable(jdbcTemplate, sql, params, clazz);
