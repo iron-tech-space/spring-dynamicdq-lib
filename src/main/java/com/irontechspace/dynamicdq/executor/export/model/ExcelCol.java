@@ -30,6 +30,7 @@ public class ExcelCol {
     private ExcelStyle headerStyle = null;
     private ExcelStyle cellStyle = null;
     private String cellFormula = null;
+    private String defValue = "-";
 
 
     public ExcelCol(QueryField queryField) {
@@ -45,6 +46,7 @@ public class ExcelCol {
         headerStyle = null;
         cellStyle = null;
         cellFormula = null;
+        defValue = "-";
     }
 
     public void setExcelCol(JsonNode jsonField) {
@@ -63,6 +65,7 @@ public class ExcelCol {
             cellStyle = jsonField.path("cellStyle").isMissingNode() ? cellStyle : OBJECT_MAPPER.treeToValue(jsonField.get("cellStyle"), ExcelStyle.class);
         } catch (JsonProcessingException ignored) {}
         cellFormula = jsonField.path("cellFormula").isMissingNode() ? cellFormula : jsonField.get("cellFormula").asText();
+        defValue = jsonField.path("defValue").isMissingNode() ? defValue : jsonField.get("defValue").asText();
 
     }
 

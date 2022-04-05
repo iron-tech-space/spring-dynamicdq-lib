@@ -270,7 +270,8 @@ public class ExportExcelService {
 
     private void setCellValue(Cell cell, ExcelCol field, JsonNode rowData){
         if(rowData.get(field.getName()) == null || rowData.get(field.getName()).isNull() || rowData.get(field.getName()).asText().trim().equals("")){
-            cell.setCellValue("---");
+//            cell.setCellValue("---");
+            cell.setCellValue(field.getDefValue());
             return;
         }
 

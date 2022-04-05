@@ -1,3 +1,7 @@
+## 0.0.46
+
+- [ExportExcel] Add def value cell
+
 ## 0.0.45
 
 - [ExportExcel] Fix col offset
