@@ -1,3 +1,7 @@
+## 0.0.43
+
+- Fix border style for export to excel (RegionUtil.setBorder - very long time executing)
+
 ## 0.0.42
 
 - Fix write SystemEvents to some DB

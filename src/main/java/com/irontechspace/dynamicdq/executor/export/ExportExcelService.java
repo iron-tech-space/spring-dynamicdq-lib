@@ -141,19 +141,24 @@ public class ExportExcelService {
                 Cell cell = row.createCell(colIdx);
                 cell.setCellStyle(getCellStyle(workbook, field));
                 setCellValue(cell, field, rowData);
-
-                if (field.getColSpan() > 1) {
+                if (field.getColSpan() > 1 && field.getCellStyle() != null) {
                     region = new CellRangeAddress(rowIndex, rowIndex, colIdx, colIdx + field.getColSpan() - 1);
                     sheet.addMergedRegion(region);
-                } else {
-                    region = new CellRangeAddress(rowIndex, rowIndex, colIdx, colIdx);
-                }
-                if (field.getCellStyle() != null)
                     setBorders(field.getCellStyle().getBorder(), region, sheet);
+                }
                 colIdx += field.getColSpan();
             }
+//            logDur(startNanosRow, "Row: [" + rowIndex + "] => ");
         }
+//        logDur(startNanos, "Table => ");
         return OBJECT_MAPPER.createObjectNode().put("rowIndex", startRowIndex + data.size()).put("colIndex", startColIndex + fields.size());
+    }
+
+    private long logDur (long startNanos, String msg) {
+        long finishNanos = System.nanoTime();
+        long durationNanos = finishNanos - startNanos;
+        log.info("{} => {}ms {}ns", msg,durationNanos / 1000000L, durationNanos % 1000000L);
+        return finishNanos;
     }
 
     private XSSFFont getFont(XSSFWorkbook workbook, ExcelFont excelFont) {
@@ -181,6 +186,24 @@ public class ExportExcelService {
         if(field.getCellStyle() != null)
             style.setFont(getFont(workbook, field.getCellStyle().getFont()));
 
+        if(field.getColSpan() == 1 && field.getCellStyle() != null){
+            ExcelBorder border = field.getCellStyle().getBorder();
+            if(border != null){
+                if(border.getTop() != null && border.getTop()) {
+                    style.setBorderTop(BorderStyle.THIN);
+                }
+                if(border.getRight() != null && border.getRight()){
+                    style.setBorderRight(BorderStyle.THIN);
+                }
+                if(border.getBottom() != null && border.getBottom()){
+                    style.setBorderBottom(BorderStyle.THIN);
+                }
+                if(border.getLeft() != null && border.getLeft()){
+                    style.setBorderLeft(BorderStyle.THIN);
+                }
+            }
+        }
+
         return style;
     }
 
@@ -198,7 +221,10 @@ public class ExportExcelService {
                 RegionUtil.setBorderTop(BorderStyle.THIN, region, sheet);
             }
             if(border.getRight() != null && border.getRight()){
+//                long st = System.nanoTime();
+                // TODO This func very long time executing
                 RegionUtil.setBorderRight(BorderStyle.THIN, region, sheet);
+//                logDur(st, "[setBorders Right]");
             }
             if(border.getBottom() != null && border.getBottom()){
                 RegionUtil.setBorderBottom(BorderStyle.THIN, region, sheet);
