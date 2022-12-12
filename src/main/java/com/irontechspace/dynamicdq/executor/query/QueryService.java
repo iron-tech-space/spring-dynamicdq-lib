@@ -466,7 +466,7 @@ public class QueryService {
                 sql.append(String.format(SQL_GROUP_BY, String.join(", ", groupBy)));
 
             if(having.size() > 0)
-                sql.append(String.format("having 1=1 %s", String.join(", ", having)));
+                sql.append(String.format("having 1=1 %s", String.join("", having)));
 
             // Добавили сортировку в SQL
             if (orderByInside.size() > 0)
