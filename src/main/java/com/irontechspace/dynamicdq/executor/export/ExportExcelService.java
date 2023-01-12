@@ -245,7 +245,6 @@ public class ExportExcelService {
         if(Arrays.asList("date", "time", "timestamp", "double").contains(field.getTypeData())) {
             style.setDataFormat(workbook.getCreationHelper().createDataFormat().getFormat(field.getDataFormat()));
         }
-
         style.setVerticalAlignment(VerticalAlignment.CENTER);
     }
 

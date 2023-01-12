@@ -36,6 +36,7 @@ public class ExcelCol {
         header = queryField.getHeader();
         name = queryField.getAliasOrName();
         align = queryField.getAlign();
+        headAlign = queryField.getAlign();
         width = queryField.getWidth();
         typeData = queryField.getTypeData();
         dataFormat = getDefaultFormat(typeData);
@@ -51,6 +52,7 @@ public class ExcelCol {
         header = jsonField.path("header").isMissingNode() ? header : jsonField.get("header").asText();
         name = jsonField.path("name").isMissingNode() ? name : jsonField.get("name").asText();
         align = jsonField.path("align").isMissingNode() ? align : jsonField.get("align").asText();
+        headAlign = jsonField.path("headAlign").isMissingNode() ? headAlign : jsonField.get("headAlign").asText();
         width = jsonField.path("width").isMissingNode() ? width : jsonField.get("width").asLong();
         typeData = jsonField.path("typeData").isMissingNode() ? typeData : jsonField.get("typeData").asText();
         dataFormat = jsonField.path("dataFormat").isMissingNode() ? getDefaultFormat(typeData) : jsonField.get("dataFormat").asText();
