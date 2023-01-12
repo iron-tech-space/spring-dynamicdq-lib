@@ -1,3 +1,10 @@
+## 0.0.45
+
+- [ExportExcel] Fix col offset
+- [ExportExcel] Many cell styles
+- [ExportExcel] Split align header and body for table
+- [ExportExcel] Add set WrapText
+
 ## 0.0.43
 
 - Fix border style for export to excel (RegionUtil.setBorder - very long time executing)

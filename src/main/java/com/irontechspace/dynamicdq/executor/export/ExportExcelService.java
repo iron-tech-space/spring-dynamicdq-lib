@@ -104,14 +104,16 @@ public class ExportExcelService {
         int startColIndex = Objects.requireNonNull(Objects.requireNonNull(body.get("startCell"), "Не заполнено startCell").get("col"), "Не заполнено startCell.col").asInt();
 
         if (hiddenHeader) {
-            for (int colIndex = startColIndex; colIndex < fields.size(); colIndex++) {
-                sheet.setColumnWidth(colIndex, pixel2WidthUnits(fields.get(colIndex).getWidth().intValue()));
+            for (int fIdx = 0, colIdx = startColIndex; fIdx < fields.size(); fIdx++) {
+                ExcelCol field = fields.get(fIdx);
+                sheet.setColumnWidth(colIdx, pixel2WidthUnits(field.getWidth().intValue()));
+                colIdx += field.getColSpan();
             }
         } else {
             Row headers = Optional.ofNullable(sheet.getRow(startRowIndex)).orElse(sheet.createRow(startRowIndex));
             headers.setHeightInPoints(headerHeight);
             Integer maxRowSpan = 1;
-            for (int fIdx = startColIndex, colIdx = startColIndex; fIdx < fields.size(); fIdx++) {
+            for (int fIdx = 0, colIdx = startColIndex; fIdx < fields.size(); fIdx++) {
                 ExcelCol field = fields.get(fIdx);
                 Cell cell = headers.createCell(colIdx);
                 cell.setCellStyle(getHeaderStyle(workbook, field));
@@ -132,14 +134,20 @@ public class ExportExcelService {
             startRowIndex += maxRowSpan;
         }
 
+        // Создание стилей на колонки
+        List<CellStyle> cellStyles = new ArrayList<>();
+        for (ExcelCol field : fields) {
+            cellStyles.add(getCellStyle(workbook, field));
+        }
+
         for (int dataIndex = 0, rowIndex = startRowIndex; dataIndex < data.size(); dataIndex++, rowIndex++) {
             JsonNode rowData = data.get(dataIndex);
             Row row = Optional.ofNullable(sheet.getRow(rowIndex)).orElse(sheet.createRow(startRowIndex + dataIndex));
             row.setHeightInPoints(rowHeight);
-            for (int fIdx = startColIndex, colIdx = startColIndex; fIdx < fields.size(); fIdx++) {
+            for (int fIdx = 0, colIdx = startColIndex; fIdx < fields.size(); fIdx++) {
                 ExcelCol field = fields.get(fIdx);
                 Cell cell = row.createCell(colIdx);
-                cell.setCellStyle(getCellStyle(workbook, field));
+                cell.setCellStyle(cellStyles.get(fIdx));
                 setCellValue(cell, field, rowData);
                 if (field.getColSpan() > 1 && field.getCellStyle() != null) {
                     region = new CellRangeAddress(rowIndex, rowIndex, colIdx, colIdx + field.getColSpan() - 1);
@@ -175,16 +183,42 @@ public class ExportExcelService {
     private CellStyle getHeaderStyle(XSSFWorkbook workbook, ExcelCol field) {
         CellStyle style = workbook.createCellStyle();
         setGeneralStyle(workbook, style, field);
-        if(field.getHeaderStyle() != null)
+        if(field.getHeaderStyle() != null) {
             style.setFont(getFont(workbook, field.getHeaderStyle().getFont()));
+
+            if(field.getHeadAlign() != null)
+                style.setAlignment(HorizontalAlignment.valueOf(field.getHeadAlign().toUpperCase()));
+
+            if (field.getHeaderStyle().getHAlign() != null)
+                style.setAlignment(HorizontalAlignment.valueOf(field.getHeaderStyle().getHAlign().toUpperCase()));
+
+            if (field.getHeaderStyle().getVAlign() != null)
+                style.setVerticalAlignment(VerticalAlignment.valueOf(field.getHeaderStyle().getVAlign().toUpperCase()));
+
+            if (field.getHeaderStyle().getWrapped() != null)
+                style.setWrapText(field.getHeaderStyle().getWrapped());
+        }
         return style;
     }
 
     private CellStyle getCellStyle(XSSFWorkbook workbook, ExcelCol field) {
         CellStyle style = workbook.createCellStyle();
         setGeneralStyle(workbook, style, field);
-        if(field.getCellStyle() != null)
+        if(field.getCellStyle() != null) {
             style.setFont(getFont(workbook, field.getCellStyle().getFont()));
+
+            if(field.getAlign() != null)
+                style.setAlignment(HorizontalAlignment.valueOf(field.getAlign().toUpperCase()));
+
+            if (field.getCellStyle().getHAlign() != null)
+                style.setAlignment(HorizontalAlignment.valueOf(field.getCellStyle().getHAlign().toUpperCase()));
+
+            if (field.getCellStyle().getVAlign() != null)
+                style.setVerticalAlignment(VerticalAlignment.valueOf(field.getCellStyle().getVAlign().toUpperCase()));
+
+            if (field.getCellStyle().getWrapped() != null)
+                style.setWrapText(field.getCellStyle().getWrapped());
+        }
 
         if(field.getColSpan() == 1 && field.getCellStyle() != null){
             ExcelBorder border = field.getCellStyle().getBorder();
@@ -211,7 +245,7 @@ public class ExportExcelService {
         if(Arrays.asList("date", "time", "timestamp", "double").contains(field.getTypeData())) {
             style.setDataFormat(workbook.getCreationHelper().createDataFormat().getFormat(field.getDataFormat()));
         }
-        style.setAlignment(HorizontalAlignment.valueOf(field.getAlign().toUpperCase()));
+
         style.setVerticalAlignment(VerticalAlignment.CENTER);
     }
 

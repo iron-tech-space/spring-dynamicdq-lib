@@ -1,9 +1,9 @@
 buildscript {
 	ext {
-		springBootVersion = '2.2.6.RELEASE'
-		postgresqlVersion = '42.2.12'
+		springBootVersion = "2.7.4"
+		postgresqlVersion = "42.5.0"
 
-		appVersion = "0.0.44"
+		appVersion = "0.0.45"
 	}
 	repositories {
 		mavenCentral()
@@ -12,16 +12,16 @@ buildscript {
 		classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
 	}
 }
-apply plugin: 'java'
-apply plugin: 'eclipse'
-apply plugin: 'io.spring.dependency-management'
+apply plugin: "java"
+apply plugin: "eclipse"
+apply plugin: "io.spring.dependency-management"
 
 jar {
-	baseName = 'spring-dynamic-query-lib'
+	baseName = "spring-dynamic-query-lib"
 	version = appVersion
 }
 
-group 'com.irontechspace'
+group "com.irontechspace"
 sourceCompatibility = 1.8
 
 repositories {
@@ -30,8 +30,8 @@ repositories {
 
 dependencies {
 	compile("org.projectlombok:lombok")
-	compile("org.apache.poi:poi-ooxml:5.0.0")
-	compile("org.aspectj:aspectjtools:1.9.5")
+	compile("org.apache.poi:poi-ooxml:5.2.2")
+	compile("org.aspectj:aspectjtools:1.9.9.1")
 	compile("org.springframework.boot:spring-boot-starter-web:${springBootVersion}")
 	compile("org.springframework.boot:spring-boot-starter-amqp:${springBootVersion}")
 	compile("org.springframework.boot:spring-boot-starter-quartz:${springBootVersion}")

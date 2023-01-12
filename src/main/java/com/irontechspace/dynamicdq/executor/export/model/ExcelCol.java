@@ -21,6 +21,7 @@ public class ExcelCol {
     private String header = "---";
     private String name = null;
     private String align = "left";
+    private String headAlign = "left";
     private Long width = 200L;
     private String typeData = "text";
     private String dataFormat = getDefaultFormat(typeData);

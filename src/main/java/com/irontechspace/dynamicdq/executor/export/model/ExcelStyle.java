@@ -8,4 +8,7 @@ import lombok.Setter;
 public class ExcelStyle {
     private ExcelBorder border;
     private ExcelFont font;
+    private String hAlign = null;
+    private String vAlign = null;
+    private Boolean wrapped = false;
 }
