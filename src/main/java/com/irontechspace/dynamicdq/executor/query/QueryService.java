@@ -37,7 +37,7 @@ public class QueryService {
     private static final String SQL_SELECT = "\tselect %s ";
     private static final String SQL_FROM_TABLE = "\n\tfrom %s a \n";
     private static final String SQL_FROM_SQL = "\n\tfrom (%s) a \n";
-    private static final String SQL_JOIN = "\t\tleft join %s %s on %s.%s = %s.%s \n";
+    private static final String SQL_JOIN = "\t\tleft join %s %s on %s.%s = %s.%s %s\n";
     private static final String SQL_WHERE_1_1 = "\twhere 1=1 \n";
     private static final String SQL_GROUP_BY = "\tgroup by %s \n";
     private static final String SQL_ORDER_BY = "\torder by %s \n";
@@ -199,7 +199,8 @@ public class QueryService {
 
                     for(int i = 0; i < joinObjs.length; i++){
 
-                        String[] joinObjsParams = joinObjs[i].split("\\.");
+                        String[] joinsAndParams = joinObjs[i].split("\\?");
+                        String[] joinObjsParams = joinsAndParams[0].split("\\.");
 
                         if(i == 0)
                             parentJoinParams = String.format("%s", queryConfig.getTableName());
@@ -237,7 +238,8 @@ public class QueryService {
                                     nextJoinCode,               // Префикс к полю новой таблицы
                                     joinObjsParams[2],          // Поле новой таблицы
                                     prevJoinCode,               // Превикс к полю предыдущей таблицы
-                                    joinObjsParams[3]);         // Поле предыдущей таблицы
+                                    joinObjsParams[3],          // Поле предыдущей таблицы
+                                    getCustomFieldName(joinsAndParams[1], prevJoinCode, nextJoinCode));
 
                             // Добавить JOIN в хранилище
                             joinTables.add(new JoinTable(nextJoinCode, compare, localJoin));
@@ -437,7 +439,6 @@ public class QueryService {
 
             // Формирование SQL
             StringBuilder sql = new StringBuilder();
-            sql.append("with t as ( \n");
 
             // Добавили поля для выборки
             sql.append(String.format(SQL_SELECT, String.join(", ", sourceFields)));
@@ -478,10 +479,16 @@ public class QueryService {
                 sql.append(SQL_PAGEABLE);
 
             // Добавить основной селект
-            if(typeQuery == TypeQuery.COUNT || typeQuery == TypeQuery.SQL_COUNT)
+            if(typeQuery == TypeQuery.COUNT || typeQuery == TypeQuery.SQL_COUNT) {
+                sql.insert(0, "with t as ( \n");
                 sql.append(") \nselect count(t.*) from t \n");
-            else
-                sql.append(String.format(") \nselect %s t.* from t \n", getRowNumber(queryFields)));
+            } else {
+                String rn = getRowNumber(queryFields);
+                if (!rn.equals("")) {
+                    sql.insert(0, "with t as ( \n");
+                    sql.append(String.format(") \nselect %s t.* from t \n", rn));
+                }
+            }
 
             if(queryConfig.getLoggingQueries())
                 log.info("[{}]\n DATA: [{}]\n PAGE SIZE: [{}], OFFSET: [{}]\n SQL: [{}]\n", queryConfig.getConfigName(), params.toString(), pageable.getPageSize(), pageable.getOffset(), sql.toString());
@@ -525,11 +532,6 @@ public class QueryService {
     private String getRowNumber(List<QueryField> queryFields){
         Optional<QueryField> rowNumber = queryFields.stream().filter(o -> o.getName().equals("row_number")).findFirst();
         return rowNumber.filter(QueryField::getVisible).map(queryField -> SQL_ROW_NUMBER).orElse("");
-//        if(rowNumber.isPresent()) {
-//            return rowNumber.get().getVisible() ? SQL_ROW_NUMBER : "";
-//        } else {
-//            return "";
-//        }
     }
 
     /** Задать Where или Having в зависимости от типа поля */
@@ -543,9 +545,12 @@ public class QueryService {
 
     /** Получить name для кастомного поля */
     private String getCustomFieldName(QueryField queryField, char fieldJoinCode){
-        String expression = queryField.getName();
-        expression = expression.replaceAll("\\{0\\}", "a");
-        expression = expression.replaceAll("\\{1\\}", String.valueOf(fieldJoinCode));
+        return getCustomFieldName(queryField.getName(), 'a', fieldJoinCode);
+    }
+
+    private String getCustomFieldName(String exp, char prevJoinCode, char nextJoinCode){
+        String expression = exp.replaceAll("\\{0\\}", String.valueOf(prevJoinCode));
+        expression = expression.replaceAll("\\{1\\}", String.valueOf(nextJoinCode));
         return expression;
     }
 

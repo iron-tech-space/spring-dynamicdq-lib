@@ -1,3 +1,8 @@
+## 0.0.47
+
+- [QueryService] Add join params
+- [QueryService] Remove CTE (with t) from simple selects
+
 ## 0.0.46
 
 - [ExportExcel] Add def value cell
