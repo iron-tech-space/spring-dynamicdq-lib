@@ -239,7 +239,7 @@ public class QueryService {
                                     joinObjsParams[2],          // Поле новой таблицы
                                     prevJoinCode,               // Превикс к полю предыдущей таблицы
                                     joinObjsParams[3],          // Поле предыдущей таблицы
-                                    getCustomFieldName(joinsAndParams[1], prevJoinCode, nextJoinCode));
+                                    getCustomFieldName(joinsAndParams.length > 1 ? joinsAndParams[1] : "", prevJoinCode, nextJoinCode));
 
                             // Добавить JOIN в хранилище
                             joinTables.add(new JoinTable(nextJoinCode, compare, localJoin));
