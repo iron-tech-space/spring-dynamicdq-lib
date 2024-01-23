@@ -3,7 +3,7 @@ buildscript {
 		springBootVersion = "2.7.4"
 		postgresqlVersion = "42.5.0"
 
-		appVersion = "0.0.47"
+		appVersion = "0.0.48"
 	}
 	repositories {
 		mavenCentral()

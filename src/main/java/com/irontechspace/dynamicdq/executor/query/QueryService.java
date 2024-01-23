@@ -315,15 +315,19 @@ public class QueryService {
 
                         for (int i = 0; i < filterFields.length; i++){
 
+                            String[] filterSignsSplit = filterSigns[i].split("\\?");
+                            String filterSign =  filterSignsSplit[0].toLowerCase();
+                            String signCustomRight = filterSignsSplit.length == 2 ? filterSignsSplit[1] : null;
+
                             if(queryConfig.getHierarchical() != null && queryConfig.getHierarchical()
-                                && (filterSigns[i].toLowerCase().equals("ilike") || filterSigns[i].toLowerCase().equals("like"))){
+                                && (filterSign.equals("ilike") || filterSign.equals("like"))){
                                 if(queryConfig.getLoggingQueries())
                                     log.info("[{}] Skip like filter", queryConfig.getConfigName());
                                 continue;
                             }
 
                             if(filter.has(filterFields[i])) {
-                                boolean paramOnly = filterSigns[i].equals("paramOnly");
+                                boolean paramOnly = filterSignsSplit[0].equals("paramOnly");
                                 String whereFieldName;
                                 String whereParamName;
 
@@ -345,6 +349,8 @@ public class QueryService {
                                 if(paramOnly)
                                     whereParamName = String.format("%s", filterFields[i]);
 
+                                signCustomRight = signCustomRight != null ? signCustomRight.replaceAll(filterFields[i], whereParamName) : null;
+
                                 /** Если массив */
                                 if(filter.get(filterFields[i]).isArray()) {
                                     ArrayNode jsonNodes = (ArrayNode) filter.get(filterFields[i]);
@@ -356,14 +362,17 @@ public class QueryService {
 
                                     // Делаем строку запроса, если массив не пустой
                                     if(values.size() > 0 && !paramOnly)
-                                        setWhereOrHaving(queryField, filterOutside, having, String.format(" and %s %s (:%s) \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
+                                        if (signCustomRight != null)
+                                            setWhereOrHaving(queryField, filterOutside, having, String.format(" and %s %s %s \n", whereFieldName, filterSign, signCustomRight));
+                                        else
+                                            setWhereOrHaving(queryField, filterOutside, having, String.format(" and %s %s (:%s) \n", whereFieldName, filterSign, whereParamName));
 //                                        filterOutside.add(String.format(" and %s %s (:%s) \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
 
                                 } else {
                                     // Если значение null
                                     if(filter.get(filterFields[i]).isNull()){
                                         if(!paramOnly)
-                                            if(filterSigns[i].toLowerCase().equals("="))
+                                            if(filterSign.equals("="))
                                                 setWhereOrHaving(queryField, filterOutside, having, String.format(" and %s is null \n", whereFieldName));
 //                                                filterOutside.add(String.format(" and %s is null \n", whereFieldName));
                                             else
@@ -372,14 +381,17 @@ public class QueryService {
                                     } else {
                                         // Делаем строку запроса
                                         if(!paramOnly)
-                                            setWhereOrHaving(queryField, filterOutside, having, String.format(" and %s %s :%s \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
+                                            if (signCustomRight != null)
+                                                setWhereOrHaving(queryField, filterOutside, having, String.format(" and %s %s %s \n", whereFieldName, filterSign, signCustomRight));
+                                            else
+                                                setWhereOrHaving(queryField, filterOutside, having, String.format(" and %s %s :%s \n", whereFieldName, filterSign, whereParamName));
 //                                            filterOutside.add(String.format(" and %s %s :%s \n", whereFieldName, filterSigns[i].toLowerCase(), whereParamName));
 
                                         // Оперделяем тип и получаем значение
                                         Object value = typeConverter.getObjectByType(queryField.getTypeData(), filterFields[i], filter);
 
                                         // Заносим значение в параметры
-                                        if (filterSigns[i].toLowerCase().equals("ilike") || filterSigns[i].toLowerCase().equals("like"))
+                                        if (filterSign.equals("ilike") || filterSign.equals("like"))
                                             params.addValue(whereParamName, SqlUtils.toSearchString((String)value));
                                         else
                                             params.addValue(whereParamName, value);

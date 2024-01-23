@@ -1,3 +1,7 @@
+## 0.0.48
+
+- [QueryService] Add where params right side
+
 ## 0.0.47
 
 - [QueryService] Add join params
